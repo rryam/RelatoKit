@@ -8,9 +8,9 @@
 
 Local-first Swift tools for preparing Feedback Assistant reports.
 
-RelatoKit (from the Portuguese `relato`, meaning report or account) helps you inspect local Feedback Assistant data, prepare a clean report payload, open Apple's native Feedback Assistant app, and hand off the boring form-filling bits to the Mac.
+RelatoKit (from the Portuguese `relato`, meaning report or account) provides a local-first Swift CLI and library for preparing Feedback Assistant reports on macOS. It can inspect the local Feedback Assistant store, generate structured report payloads, open Apple's native app, and assist with form entry through Accessibility automation.
 
-It keeps Feedback Assistant in charge of authentication, diagnostics, and final submission. RelatoKit does not bypass entitlements, disable platform security, forge Apple credentials, or submit feedback without the explicit `--confirm` action.
+RelatoKit keeps authentication, diagnostics, and final submission inside Feedback Assistant. It does not bypass entitlements, disable platform security, forge Apple credentials, or submit feedback without the explicit `--confirm` flag.
 
 ```sh
 relato prepare \
@@ -107,7 +107,7 @@ relato open-native --payload feedback-submission.json
 relato fill --payload feedback-submission.json
 ```
 
-Submit through the native app only when you mean it:
+Submit through the native app with explicit confirmation:
 
 ```sh
 relato submit --payload feedback-submission.json --dry-run
@@ -116,7 +116,7 @@ relato submit --payload feedback-submission.json --confirm
 
 Without `--confirm`, `relato submit` opens and fills Feedback Assistant, then stops before clicking the native Submit button.
 
-With `--confirm`, RelatoKit still stays on Apple's side of the fence: it asks the signed-in native app to submit through the visible UI, then performs a best-effort local store verification. That check can show local store changes and matching recent items, but it is not an Apple server receipt.
+With `--confirm`, RelatoKit uses the signed-in native app to submit through the visible UI, then performs best-effort local store verification. This check can show local store changes and matching recent items, but it is not a server-side receipt from Apple.
 
 ## Commands
 
@@ -137,7 +137,7 @@ relato version
 
 ## Current Status
 
-This is a pre-1.0 package with a deliberately conservative command surface: inspect, prepare, open, fill, hand off, and optionally click the visible native Submit button with an explicit flag. `relato submit --confirm` is native app automation; it is not private headless submission.
+RelatoKit is a pre-1.0 package focused on local store inspection, report preparation, native app launch, Accessibility-assisted form entry, explicit native UI submission, and best-effort local verification. `relato submit --confirm` is native app automation; it is not private headless submission.
 
 The package also includes `Research/feedbackd_probe.m`, an exploratory probe for Feedback Assistant private framework discovery. It is not part of the Swift package build. The first live XPC spike against `feedbackd` hit an entitlement refusal at listener level, and that boundary is respected by the public CLI.
 
