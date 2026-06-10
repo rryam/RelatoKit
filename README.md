@@ -96,6 +96,8 @@ relato submit --payload feedback-submission.json --confirm-submit
 
 Without `--confirm-submit`, `relato submit` opens and fills Feedback Assistant, then stops before clicking the native Submit button.
 
+With `--confirm-submit`, RelatoKit still stays on Apple's side of the fence: it asks the signed-in native app to submit through the visible UI, then performs a best-effort local store verification. That check can show local store changes and matching recent items, but it is not an Apple server receipt.
+
 ## Commands
 
 ```sh
@@ -109,12 +111,12 @@ relato routes
 relato open ROUTE [--id ID] [--print-only]
 relato open-native [--payload PATH]
 relato fill [--payload PATH] [--select-popups] [--script PATH]
-relato submit [--payload PATH] [--select-popups] [--wait-seconds N] [--confirm-submit]
+relato submit [--payload PATH] [--select-popups] [--wait-seconds N] [--confirm-submit] [--verify-store]
 ```
 
 ## Current Status
 
-This is an early research package. The safe surface is intentionally boring: inspect, prepare, open, fill, and hand off. `relato submit --confirm-submit` is still native app automation; it is not private headless submission.
+This is an early research package. The safe surface is intentionally boring: inspect, prepare, open, fill, hand off, and optionally click the visible native Submit button with an explicit flag. `relato submit --confirm-submit` is still native app automation; it is not private headless submission.
 
 The package also includes `Research/feedbackd_probe.m`, an exploratory probe for Feedback Assistant private framework discovery. It is not part of the Swift package build. The first live XPC spike against `feedbackd` hit an entitlement refusal at listener level, and that boundary is respected by the public CLI.
 

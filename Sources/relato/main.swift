@@ -163,10 +163,15 @@ enum RelatoCLI {
         let confirmSubmit = takeFlag("--confirm-submit", from: &arguments)
         let scriptPath = takeOption("--script", from: &arguments).map(expandedPath)
         let waitSeconds = Double(takeOption("--wait-seconds", from: &arguments) ?? "1.5") ?? 1.5
+        let verifyStore = takeFlag("--verify-store", from: &arguments) || confirmSubmit
+        let verifyWaitSeconds = Double(takeOption("--verify-wait-seconds", from: &arguments) ?? "3.0") ?? 3.0
+        let dbPath = takeOption("--db", from: &arguments) ?? FeedbackStore.defaultPath
         let payload = try loadPayload(at: payloadPath)
         guard let url = URL(string: payload.url) else {
             throw RelatoError.invalidArgument("Payload URL is invalid")
         }
+        let store = FeedbackStore(path: dbPath)
+        let beforeSnapshot = verifyStore ? try? store.verificationSnapshot(title: payload.title) : nil
 
         try FeedbackAssistantApp.open(url)
         Thread.sleep(forTimeInterval: waitSeconds)
@@ -183,6 +188,12 @@ enum RelatoCLI {
             print("Submit click requested through the native Feedback Assistant UI.")
         } else {
             print("Opened and filled Feedback Assistant. Re-run with --confirm-submit to click the native Submit button.")
+        }
+
+        if verifyStore {
+            Thread.sleep(forTimeInterval: verifyWaitSeconds)
+            let afterSnapshot = try? store.verificationSnapshot(title: payload.title)
+            printStoreVerification(before: beforeSnapshot, after: afterSnapshot, title: payload.title)
         }
     }
 
@@ -245,6 +256,49 @@ enum RelatoCLI {
         }
     }
 
+    static func printStoreVerification(
+        before: StoreVerificationSnapshot?,
+        after: StoreVerificationSnapshot?,
+        title: String
+    ) {
+        print("")
+        print("Local store verification:")
+
+        guard let after else {
+            print("  could not read Feedback Assistant store after native handoff")
+            return
+        }
+
+        if let before {
+            let contentDelta = after.contentItemCount - before.contentItemCount
+            let uploadDelta = after.uploadTaskCount - before.uploadTaskCount
+            print("  content items: \(before.contentItemCount) -> \(after.contentItemCount) (\(signed(contentDelta)))")
+            print("  upload tasks:   \(before.uploadTaskCount) -> \(after.uploadTaskCount) (\(signed(uploadDelta)))")
+        } else {
+            print("  content items: \(after.contentItemCount)")
+            print("  upload tasks:   \(after.uploadTaskCount)")
+        }
+
+        if !after.matchingItems.isEmpty {
+            print("  matching local item(s) for title '\(title)':")
+            for item in after.matchingItems {
+                let displayTitle = item.title.isEmpty ? item.subtitle : item.title
+                print("    #\(item.pk) remote_id=\(item.remoteID) type=\(item.type) updated=\(item.updated) \(displayTitle)")
+            }
+        } else if let newest = after.newestItem {
+            let displayTitle = newest.title.isEmpty ? newest.subtitle : newest.title
+            print("  no exact title match found; newest local item is #\(newest.pk) \(displayTitle)")
+        } else {
+            print("  no local content items found")
+        }
+
+        print("  note: this is a best-effort local check, not an Apple server receipt")
+    }
+
+    static func signed(_ value: Int) -> String {
+        value >= 0 ? "+\(value)" : "\(value)"
+    }
+
     static func printHelp() {
         print(
             """
@@ -261,7 +315,7 @@ enum RelatoCLI {
               relato open ROUTE [--id ID] [--print-only]
               relato open-native [--payload PATH]
               relato fill [--payload PATH] [--select-popups] [--script PATH]
-              relato submit [--payload PATH] [--select-popups] [--wait-seconds N] [--confirm-submit]
+              relato submit [--payload PATH] [--select-popups] [--wait-seconds N] [--confirm-submit] [--verify-store]
             """
         )
     }

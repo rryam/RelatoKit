@@ -15,6 +15,13 @@ public struct ContentItemRow: Equatable {
     public var subtitle: String
 }
 
+public struct StoreVerificationSnapshot: Equatable {
+    public var contentItemCount: Int
+    public var uploadTaskCount: Int
+    public var newestItem: ContentItemRow?
+    public var matchingItems: [ContentItemRow]
+}
+
 public struct UploadTaskRow: Equatable {
     public var pk: String
     public var taskID: String
@@ -74,6 +81,47 @@ public final class FeedbackStore {
             ).map {
                 ContentItemRow(pk: $0[0], remoteID: $0[1], type: $0[2], updated: $0[3], title: $0[4], subtitle: $0[5])
             }
+        }
+    }
+
+    public func verificationSnapshot(title: String, limit: Int = 5) throws -> StoreVerificationSnapshot {
+        try withDatabase { db in
+            let contentItemCount = try db.scalarInt("SELECT count(*) FROM ZCONTENTITEM")
+            let uploadTaskCount = try db.scalarInt("SELECT count(*) FROM ZUPLOADTASK")
+            let newestItem = try db.rows(
+                """
+                SELECT Z_PK, ZREMOTEID, ZTYPE, ZUPDATEDAT,
+                       COALESCE(ZTITLE, ''),
+                       COALESCE(ZSUBTITLE, '')
+                FROM ZCONTENTITEM
+                ORDER BY ZUPDATEDAT DESC
+                LIMIT 1
+                """
+            ).map {
+                ContentItemRow(pk: $0[0], remoteID: $0[1], type: $0[2], updated: $0[3], title: $0[4], subtitle: $0[5])
+            }.first
+
+            let matchingRows = try db.rows(
+                """
+                SELECT Z_PK, ZREMOTEID, ZTYPE, ZUPDATEDAT,
+                       COALESCE(ZTITLE, ''),
+                       COALESCE(ZSUBTITLE, '')
+                FROM ZCONTENTITEM
+                WHERE ZTITLE = ? OR ZSUBTITLE LIKE ?
+                ORDER BY ZUPDATEDAT DESC
+                LIMIT ?
+                """,
+                bindings: [.text(title), .text("%\(title)%"), .int(limit)]
+            ).map {
+                ContentItemRow(pk: $0[0], remoteID: $0[1], type: $0[2], updated: $0[3], title: $0[4], subtitle: $0[5])
+            }
+
+            return StoreVerificationSnapshot(
+                contentItemCount: contentItemCount,
+                uploadTaskCount: uploadTaskCount,
+                newestItem: newestItem,
+                matchingItems: matchingRows
+            )
         }
     }
 
