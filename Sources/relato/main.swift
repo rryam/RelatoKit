@@ -160,7 +160,7 @@ enum RelatoCLI {
         var arguments = rawArguments
         let payloadPath = expandedPath(takeOption("--payload", from: &arguments) ?? "feedback-submission.json")
         let selectPopups = takeFlag("--select-popups", from: &arguments)
-        let confirmSubmit = takeFlag("--confirm", from: &arguments) || takeFlag("--confirm-submit", from: &arguments)
+        let confirmSubmit = takeFlag("--confirm", from: &arguments)
         let scriptPath = takeOption("--script", from: &arguments).map(expandedPath)
         let waitSeconds = Double(takeOption("--wait-seconds", from: &arguments) ?? "1.5") ?? 1.5
         let verifyStore = takeFlag("--verify-store", from: &arguments) || confirmSubmit
