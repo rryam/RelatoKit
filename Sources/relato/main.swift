@@ -27,6 +27,8 @@ enum RelatoCLI {
             try runOpenNative(arguments)
         case "fill":
             try runFill(arguments)
+        case "submit":
+            try runSubmit(arguments)
         default:
             throw RelatoError.invalidArgument("Unknown command: \(command)")
         }
@@ -154,6 +156,36 @@ enum RelatoCLI {
         }
     }
 
+    static func runSubmit(_ rawArguments: [String]) throws {
+        var arguments = rawArguments
+        let payloadPath = expandedPath(takeOption("--payload", from: &arguments) ?? "feedback-submission.json")
+        let selectPopups = takeFlag("--select-popups", from: &arguments)
+        let confirmSubmit = takeFlag("--confirm-submit", from: &arguments)
+        let scriptPath = takeOption("--script", from: &arguments).map(expandedPath)
+        let waitSeconds = Double(takeOption("--wait-seconds", from: &arguments) ?? "1.5") ?? 1.5
+        let payload = try loadPayload(at: payloadPath)
+        guard let url = URL(string: payload.url) else {
+            throw RelatoError.invalidArgument("Payload URL is invalid")
+        }
+
+        try FeedbackAssistantApp.open(url)
+        Thread.sleep(forTimeInterval: waitSeconds)
+
+        let scriptURL = try scriptPath.map(URL.init(fileURLWithPath:)) ?? bundledFillScript()
+        try FeedbackAssistantApp.fill(
+            payload: payload,
+            scriptURL: scriptURL,
+            selectPopups: selectPopups,
+            confirmSubmit: confirmSubmit
+        )
+
+        if confirmSubmit {
+            print("Submit click requested through the native Feedback Assistant UI.")
+        } else {
+            print("Opened and filled Feedback Assistant. Re-run with --confirm-submit to click the native Submit button.")
+        }
+    }
+
     static func loadPayload(at path: String) throws -> PreparedFeedback {
         guard FileManager.default.fileExists(atPath: path) else {
             throw RelatoError.missingFile(path)
@@ -229,6 +261,7 @@ enum RelatoCLI {
               relato open ROUTE [--id ID] [--print-only]
               relato open-native [--payload PATH]
               relato fill [--payload PATH] [--select-popups] [--script PATH]
+              relato submit [--payload PATH] [--select-popups] [--wait-seconds N] [--confirm-submit]
             """
         )
     }

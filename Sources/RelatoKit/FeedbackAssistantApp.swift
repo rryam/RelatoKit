@@ -5,7 +5,12 @@ public enum FeedbackAssistantApp {
         try run("/usr/bin/open", arguments: ["-b", FeedbackRoutes.appBundleIdentifier, url.absoluteString])
     }
 
-    public static func fill(payload: PreparedFeedback, scriptURL: URL, selectPopups: Bool = false) throws {
+    public static func fill(
+        payload: PreparedFeedback,
+        scriptURL: URL,
+        selectPopups: Bool = false,
+        confirmSubmit: Bool = false
+    ) throws {
         guard FileManager.default.fileExists(atPath: scriptURL.path) else {
             throw RelatoError.missingFile(scriptURL.path)
         }
@@ -19,7 +24,8 @@ public enum FeedbackAssistantApp {
                 payload.kind.nativeLabel,
                 payload.snapshot ?? "",
                 payload.bundleID ?? "",
-                selectPopups ? "true" : "false"
+                selectPopups ? "true" : "false",
+                confirmSubmit ? "true" : "false"
             ]
         )
     }

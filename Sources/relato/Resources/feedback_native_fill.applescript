@@ -6,6 +6,7 @@ on run argv
   set snapshotPath to item 5 of argv
   set bundleID to item 6 of argv
   set shouldSelectPopups to item 7 of argv
+  set shouldSubmit to item 8 of argv
 
   tell application "Feedback Assistant" to activate
   delay 0.5
@@ -37,6 +38,10 @@ on run argv
 
       if snapshotPath is not "" then
         my attachFile(targetScroll, snapshotPath)
+      end if
+
+      if shouldSubmit is "true" then
+        my clickSubmit(targetWindow, targetScroll)
       end if
     end tell
   end tell
@@ -113,3 +118,18 @@ on attachFile(targetScroll, snapshotPath)
     delay 1.0
   end tell
 end attachFile
+
+on clickSubmit(targetWindow, targetScroll)
+  tell application "System Events"
+    try
+      click button "Submit" of targetScroll
+      return
+    end try
+
+    try
+      click button "Submit" of targetWindow
+      return
+    end try
+  end tell
+  error "Could not find Submit button. Make sure all required fields and diagnostics are complete."
+end clickSubmit

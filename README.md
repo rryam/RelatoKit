@@ -4,7 +4,7 @@ Local-first Swift tools for preparing Feedback Assistant reports.
 
 RelatoKit (from the Portuguese `relato`, meaning report or account) helps you inspect local Feedback Assistant data, prepare a clean report payload, open Apple's native Feedback Assistant app, and hand off the boring form-filling bits to the Mac.
 
-It keeps Feedback Assistant in charge of authentication, diagnostics, and final submission. RelatoKit does not bypass entitlements, disable platform security, forge Apple credentials, or submit feedback without explicit user action.
+It keeps Feedback Assistant in charge of authentication, diagnostics, and final submission. RelatoKit does not bypass entitlements, disable platform security, forge Apple credentials, or submit feedback without the explicit `--confirm-submit` action.
 
 ```sh
 relato prepare \
@@ -88,7 +88,13 @@ relato open-native --payload feedback-submission.json
 relato fill --payload feedback-submission.json
 ```
 
-The final Submit button remains yours.
+Submit through the native app only when you mean it:
+
+```sh
+relato submit --payload feedback-submission.json --confirm-submit
+```
+
+Without `--confirm-submit`, `relato submit` opens and fills Feedback Assistant, then stops before clicking the native Submit button.
 
 ## Commands
 
@@ -103,11 +109,12 @@ relato routes
 relato open ROUTE [--id ID] [--print-only]
 relato open-native [--payload PATH]
 relato fill [--payload PATH] [--select-popups] [--script PATH]
+relato submit [--payload PATH] [--select-popups] [--wait-seconds N] [--confirm-submit]
 ```
 
 ## Current Status
 
-This is an early research package. The safe surface is intentionally boring: inspect, prepare, open, fill, and hand off.
+This is an early research package. The safe surface is intentionally boring: inspect, prepare, open, fill, and hand off. `relato submit --confirm-submit` is still native app automation; it is not private headless submission.
 
 The package also includes `Research/feedbackd_probe.m`, an exploratory probe for Feedback Assistant private framework discovery. It is not part of the Swift package build. The first live XPC spike against `feedbackd` hit an entitlement refusal at listener level, and that boundary is respected by the public CLI.
 
