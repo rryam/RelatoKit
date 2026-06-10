@@ -1,5 +1,11 @@
 # RelatoKit
 
+[![CI](https://github.com/rryam/RelatoKit/actions/workflows/ci.yml/badge.svg)](https://github.com/rryam/RelatoKit/actions/workflows/ci.yml)
+[![Swift](https://img.shields.io/badge/Swift-6.0+-fa7343?style=flat&logo=swift&logoColor=white)](https://swift.org)
+[![Platform](https://img.shields.io/badge/macOS-14.0+-000000?style=flat&logo=apple&logoColor=white)](https://developer.apple.com/macos/)
+[![SPM](https://img.shields.io/badge/SPM-compatible-brightgreen.svg)](https://swift.org/package-manager/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
 Local-first Swift tools for preparing Feedback Assistant reports.
 
 RelatoKit (from the Portuguese `relato`, meaning report or account) helps you inspect local Feedback Assistant data, prepare a clean report payload, open Apple's native Feedback Assistant app, and hand off the boring form-filling bits to the Mac.
@@ -36,6 +42,18 @@ cd RelatoKit
 swift build -c release
 .build/release/relato --help
 .build/release/relato version
+```
+
+Add the library to another Swift package:
+
+```swift
+dependencies: [
+    .package(url: "https://github.com/rryam/RelatoKit.git", branch: "main")
+]
+```
+
+```swift
+.product(name: "RelatoKit", package: "RelatoKit")
 ```
 
 ## What It Does
@@ -119,7 +137,7 @@ relato version
 
 ## Current Status
 
-This is an early research package. The safe surface is intentionally boring: inspect, prepare, open, fill, hand off, and optionally click the visible native Submit button with an explicit flag. `relato submit --confirm` is still native app automation; it is not private headless submission.
+This is a pre-1.0 package with a deliberately conservative command surface: inspect, prepare, open, fill, hand off, and optionally click the visible native Submit button with an explicit flag. `relato submit --confirm` is native app automation; it is not private headless submission.
 
 The package also includes `Research/feedbackd_probe.m`, an exploratory probe for Feedback Assistant private framework discovery. It is not part of the Swift package build. The first live XPC spike against `feedbackd` hit an entitlement refusal at listener level, and that boundary is respected by the public CLI.
 
@@ -143,6 +161,7 @@ make check
 ## Documentation
 
 - [docs/COMMANDS.md](docs/COMMANDS.md) - generated command reference
+- [CHANGELOG.md](CHANGELOG.md) - release notes
 - [CONTRIBUTING.md](CONTRIBUTING.md) - development workflow
 - [SUPPORT.md](SUPPORT.md) - support checklist
 - [SECURITY.md](SECURITY.md) - security reporting and project boundary
@@ -150,3 +169,9 @@ make check
 ## License
 
 MIT
+
+---
+
+<p align="center">
+  <sub>RelatoKit is an independent, unofficial tool and is not affiliated with, endorsed by, or sponsored by Apple Inc. Apple, macOS, Xcode, and Feedback Assistant are trademarks of Apple Inc.</sub>
+</p>

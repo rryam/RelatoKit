@@ -1,0 +1,54 @@
+name: Bug report
+description: Report a reproducible RelatoKit bug
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Include the exact `relato` command when possible.
+      placeholder: |
+        1. Run `relato ...`
+        2. Observe ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: RelatoKit Version
+      placeholder: "`relato version` output"
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS Version
+      placeholder: "macOS 15.5"
+    validations:
+      required: true
+  - type: dropdown
+    id: accessibility
+    attributes:
+      label: Accessibility Permission
+      description: Required for `fill` and `submit`.
+      options:
+        - "Not using fill/submit"
+        - "Terminal has Accessibility permission"
+        - "Terminal does not have Accessibility permission"
+        - "Not sure"
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Output
+      description: Paste redacted command output. Do not include private Apple account details or confidential feedback contents.
+      render: shell
