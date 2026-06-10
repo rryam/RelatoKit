@@ -160,7 +160,7 @@ enum RelatoCLI {
         var arguments = rawArguments
         let payloadPath = expandedPath(takeOption("--payload", from: &arguments) ?? "feedback-submission.json")
         let selectPopups = takeFlag("--select-popups", from: &arguments)
-        let confirmSubmit = takeFlag("--confirm-submit", from: &arguments)
+        let confirmSubmit = takeFlag("--confirm", from: &arguments) || takeFlag("--confirm-submit", from: &arguments)
         let scriptPath = takeOption("--script", from: &arguments).map(expandedPath)
         let waitSeconds = Double(takeOption("--wait-seconds", from: &arguments) ?? "1.5") ?? 1.5
         let verifyStore = takeFlag("--verify-store", from: &arguments) || confirmSubmit
@@ -187,7 +187,7 @@ enum RelatoCLI {
         if confirmSubmit {
             print("Submit click requested through the native Feedback Assistant UI.")
         } else {
-            print("Opened and filled Feedback Assistant. Re-run with --confirm-submit to click the native Submit button.")
+            print("Opened and filled Feedback Assistant. Re-run with --confirm to click the native Submit button.")
         }
 
         if verifyStore {
@@ -315,7 +315,7 @@ enum RelatoCLI {
               relato open ROUTE [--id ID] [--print-only]
               relato open-native [--payload PATH]
               relato fill [--payload PATH] [--select-popups] [--script PATH]
-              relato submit [--payload PATH] [--select-popups] [--wait-seconds N] [--confirm-submit] [--verify-store]
+              relato submit [--payload PATH] [--select-popups] [--wait-seconds N] [--confirm] [--verify-store]
             """
         )
     }
