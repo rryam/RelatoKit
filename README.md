@@ -35,6 +35,7 @@ git clone https://github.com/rryam/RelatoKit.git
 cd RelatoKit
 swift build -c release
 .build/release/relato --help
+.build/release/relato version
 ```
 
 ## What It Does
@@ -91,6 +92,7 @@ relato fill --payload feedback-submission.json
 Submit through the native app only when you mean it:
 
 ```sh
+relato submit --payload feedback-submission.json --dry-run
 relato submit --payload feedback-submission.json --confirm
 ```
 
@@ -111,7 +113,8 @@ relato routes
 relato open ROUTE [--id ID] [--print-only]
 relato open-native [--payload PATH]
 relato fill [--payload PATH] [--select-popups] [--script PATH]
-relato submit [--payload PATH] [--select-popups] [--wait-seconds N] [--confirm] [--verify-store]
+relato submit [--payload PATH] [--select-popups] [--wait-seconds N] [--confirm] [--verify-store] [--dry-run]
+relato version
 ```
 
 ## Current Status
@@ -134,7 +137,15 @@ The package also includes `Research/feedbackd_probe.m`, an exploratory probe for
 swift build
 swift test
 swift build -c release
+make check
 ```
+
+## Documentation
+
+- [docs/COMMANDS.md](docs/COMMANDS.md) - generated command reference
+- [CONTRIBUTING.md](CONTRIBUTING.md) - development workflow
+- [SUPPORT.md](SUPPORT.md) - support checklist
+- [SECURITY.md](SECURITY.md) - security reporting and project boundary
 
 ## License
 

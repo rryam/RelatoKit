@@ -2,8 +2,14 @@ import Foundation
 import RelatoKit
 
 enum RelatoCLI {
+    static let version = "0.1.0-dev"
+
     static func run(_ rawArguments: [String]) throws {
         var arguments = rawArguments
+        if arguments == ["--version"] || arguments == ["-v"] {
+            print(version)
+            return
+        }
         if arguments.isEmpty || arguments.contains("--help") || arguments.contains("-h") {
             printHelp()
             return
@@ -11,6 +17,8 @@ enum RelatoCLI {
 
         let command = arguments.removeFirst()
         switch command {
+        case "version":
+            print(version)
         case "store":
             try runStore(arguments)
         case "categories":
@@ -165,11 +173,26 @@ enum RelatoCLI {
         let waitSeconds = Double(takeOption("--wait-seconds", from: &arguments) ?? "1.5") ?? 1.5
         let verifyStore = takeFlag("--verify-store", from: &arguments) || confirmSubmit
         let verifyWaitSeconds = Double(takeOption("--verify-wait-seconds", from: &arguments) ?? "3.0") ?? 3.0
+        let dryRun = takeFlag("--dry-run", from: &arguments)
         let dbPath = takeOption("--db", from: &arguments) ?? FeedbackStore.defaultPath
         let payload = try loadPayload(at: payloadPath)
         guard let url = URL(string: payload.url) else {
             throw RelatoError.invalidArgument("Payload URL is invalid")
         }
+
+        if dryRun {
+            printSubmitPlan(
+                payloadPath: payloadPath,
+                payload: payload,
+                url: url,
+                selectPopups: selectPopups,
+                confirmSubmit: confirmSubmit,
+                verifyStore: verifyStore,
+                dbPath: dbPath
+            )
+            return
+        }
+
         let store = FeedbackStore(path: dbPath)
         let beforeSnapshot = verifyStore ? try? store.verificationSnapshot(title: payload.title) : nil
 
@@ -299,12 +322,39 @@ enum RelatoCLI {
         value >= 0 ? "+\(value)" : "\(value)"
     }
 
+    static func printSubmitPlan(
+        payloadPath: String,
+        payload: PreparedFeedback,
+        url: URL,
+        selectPopups: Bool,
+        confirmSubmit: Bool,
+        verifyStore: Bool,
+        dbPath: String
+    ) {
+        print("Submit plan:")
+        print("  payload:       \(payloadPath)")
+        print("  title:         \(payload.title)")
+        print("  topic:         \(payload.category.topic)")
+        print("  area:          \(payload.category.area)")
+        print("  kind:          \(payload.kind.rawValue)")
+        print("  bundle ID:     \(payload.bundleID ?? "")")
+        print("  snapshot:      \(payload.snapshot ?? "")")
+        print("  native URL:    \(url.absoluteString)")
+        print("  select popups: \(selectPopups ? "yes" : "no")")
+        print("  click Submit:  \(confirmSubmit ? "yes (--confirm)" : "no")")
+        print("  verify store:  \(verifyStore ? "yes" : "no")")
+        if verifyStore {
+            print("  store:         \(NSString(string: dbPath).expandingTildeInPath)")
+        }
+    }
+
     static func printHelp() {
         print(
             """
             relato: local-first tooling for Feedback Assistant workflows
 
             Commands:
+              relato version
               relato store summary [--db PATH]
               relato store list [--limit N] [--db PATH]
               relato store uploads [--limit N] [--db PATH]
@@ -315,7 +365,7 @@ enum RelatoCLI {
               relato open ROUTE [--id ID] [--print-only]
               relato open-native [--payload PATH]
               relato fill [--payload PATH] [--select-popups] [--script PATH]
-              relato submit [--payload PATH] [--select-popups] [--wait-seconds N] [--confirm] [--verify-store]
+              relato submit [--payload PATH] [--select-popups] [--wait-seconds N] [--confirm] [--verify-store] [--dry-run]
             """
         )
     }
