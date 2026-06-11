@@ -27,7 +27,7 @@ make generate-command-docs
 - `relato open ROUTE [--id ID] [--print-only]`
 - `relato open-native [--payload PATH]`
 - `relato fill [--payload PATH] [--select-popups] [--script PATH]`
-- `relato submit [--payload PATH] [--select-popups] [--wait-seconds N] [--confirm] [--verify-store] [--dry-run]`
+- `relato submit [--payload PATH] [--select-popups] [--script PATH] [--wait-seconds N] [--verify-wait-seconds N] [--db PATH] [--confirm] [--verify-store] [--dry-run]`
 
 ## Scripting Tips
 

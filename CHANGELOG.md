@@ -14,3 +14,6 @@ All notable changes to RelatoKit will be documented in this file.
 - Added `relato submit --dry-run` for previewing the native handoff plan.
 - Added best-effort local store verification after native submission.
 - Added generated command reference, CI, support, security, and contributing docs.
+- Improved native form filling for the Feedback Assistant topic chooser, loading state, popups, bundle ID fields, and local attachments.
+- Improved CLI validation for unknown arguments, invalid `--kind` values, numeric options, malformed payloads, and non-Feedback Assistant payload URLs.
+- Added URL and route tests for prepared feedback payloads.

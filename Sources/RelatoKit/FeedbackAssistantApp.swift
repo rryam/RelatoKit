@@ -20,6 +20,7 @@ public enum FeedbackAssistantApp {
                 scriptURL.path,
                 payload.title,
                 payload.description,
+                payload.category.topic,
                 payload.category.area,
                 payload.kind.nativeLabel,
                 payload.snapshot ?? "",

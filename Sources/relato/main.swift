@@ -48,19 +48,23 @@ enum RelatoCLI {
             throw RelatoError.invalidArgument("store requires a subcommand: summary, list, uploads")
         }
         let subcommand = arguments.removeFirst()
-        let dbPath = takeOption("--db", from: &arguments) ?? FeedbackStore.defaultPath
+        let dbPath = try takeOption("--db", from: &arguments) ?? FeedbackStore.defaultPath
         let store = FeedbackStore(path: dbPath)
 
         switch subcommand {
         case "summary":
+            try ensureNoArguments(arguments)
+            let rows = try store.summary()
             print("store: \(NSString(string: dbPath).expandingTildeInPath)")
-            printTable([["table", "rows"]] + (try store.summary()).map { [$0.table, String($0.rows)] })
+            printTable([["table", "rows"]] + rows.map { [$0.table, String($0.rows)] })
         case "list":
-            let limit = Int(takeOption("--limit", from: &arguments) ?? "20") ?? 20
+            let limit = try parseLimit(try takeOption("--limit", from: &arguments) ?? "20")
+            try ensureNoArguments(arguments)
             let rows = try store.contentItems(limit: limit)
             printTable([["pk", "remote_id", "type", "updated", "title", "subtitle"]] + rows.map { [$0.pk, $0.remoteID, $0.type, $0.updated, $0.title, $0.subtitle] })
         case "uploads":
-            let limit = Int(takeOption("--limit", from: &arguments) ?? "20") ?? 20
+            let limit = try parseLimit(try takeOption("--limit", from: &arguments) ?? "20")
+            try ensureNoArguments(arguments)
             let rows = try store.uploadTasks(limit: limit)
             printTable([["pk", "task_id", "state", "stage", "uploaded", "total"]] + rows.map { [$0.pk, $0.taskID, $0.state, $0.stage, $0.uploaded, $0.total] })
         default:
@@ -70,7 +74,8 @@ enum RelatoCLI {
 
     static func runCategories(_ rawArguments: [String]) throws {
         var arguments = rawArguments
-        let dbPath = takeOption("--db", from: &arguments) ?? FeedbackStore.defaultPath
+        let dbPath = try takeOption("--db", from: &arguments) ?? FeedbackStore.defaultPath
+        try ensureNoArguments(arguments)
         let store = FeedbackStore(path: dbPath)
         let rows = try store.formStubs()
         printTable([["topic", "tat", "platform", "description"]] + rows.map { [$0.topic, $0.tat, $0.platform, $0.description] })
@@ -79,8 +84,9 @@ enum RelatoCLI {
     static func runCategorize(_ rawArguments: [String]) throws {
         var arguments = rawArguments
         let title = try requireOption("--title", from: &arguments)
-        let description = takeOption("--description", from: &arguments) ?? ""
-        let bundleID = takeOption("--bundle-id", from: &arguments)
+        let description = try takeOption("--description", from: &arguments) ?? ""
+        let bundleID = try takeOption("--bundle-id", from: &arguments)
+        try ensureNoArguments(arguments)
         let category = FeedbackCategoryInferer().infer(title: title, description: description, bundleID: bundleID)
         try printJSON(category)
     }
@@ -89,11 +95,15 @@ enum RelatoCLI {
         var arguments = rawArguments
         let title = try requireOption("--title", from: &arguments)
         let description = try requireOption("--description", from: &arguments)
-        let bundleID = takeOption("--bundle-id", from: &arguments)
-        let kind = FeedbackKind(rawValue: takeOption("--kind", from: &arguments) ?? "bug") ?? .bug
-        let outputDir = expandedPath(takeOption("--output-dir", from: &arguments) ?? FileManager.default.currentDirectoryPath)
+        let bundleID = try takeOption("--bundle-id", from: &arguments)
+        let kindValue = try takeOption("--kind", from: &arguments) ?? "bug"
+        guard let kind = FeedbackKind(rawValue: kindValue) else {
+            throw RelatoError.invalidArgument("Invalid value for --kind: \(kindValue). Expected bug or suggestion.")
+        }
+        let outputDir = expandedPath(try takeOption("--output-dir", from: &arguments) ?? FileManager.default.currentDirectoryPath)
 
-        var snapshot = takeOption("--snapshot", from: &arguments).map(expandedPath)
+        var snapshot = try takeOption("--snapshot", from: &arguments).map(expandedPath)
+        try ensureNoArguments(arguments)
         if let snapshotPath = snapshot {
             snapshot = URL(fileURLWithPath: snapshotPath).standardizedFileURL.path
             if !FileManager.default.fileExists(atPath: snapshot!) {
@@ -131,8 +141,9 @@ enum RelatoCLI {
             throw RelatoError.invalidArgument("open requires a route")
         }
         let route = arguments.removeFirst()
-        let id = takeOption("--id", from: &arguments)
+        let id = try takeOption("--id", from: &arguments)
         let printOnly = takeFlag("--print-only", from: &arguments)
+        try ensureNoArguments(arguments)
         let url = try FeedbackRoutes.url(for: route, id: id)
         if printOnly {
             print(url.absoluteString)
@@ -143,42 +154,43 @@ enum RelatoCLI {
 
     static func runOpenNative(_ rawArguments: [String]) throws {
         var arguments = rawArguments
-        let payloadPath = expandedPath(takeOption("--payload", from: &arguments) ?? "feedback-submission.json")
+        let payloadPath = expandedPath(try takeOption("--payload", from: &arguments) ?? "feedback-submission.json")
+        try ensureNoArguments(arguments)
         let payload = try loadPayload(at: payloadPath)
-        guard let url = URL(string: payload.url) else {
-            throw RelatoError.invalidArgument("Payload URL is invalid")
-        }
+        let url = try feedbackURL(from: payload)
         try FeedbackAssistantApp.open(url)
     }
 
     static func runFill(_ rawArguments: [String]) throws {
         var arguments = rawArguments
-        let payloadPath = expandedPath(takeOption("--payload", from: &arguments) ?? "feedback-submission.json")
+        let payloadPath = expandedPath(try takeOption("--payload", from: &arguments) ?? "feedback-submission.json")
         let selectPopups = takeFlag("--select-popups", from: &arguments)
-        let scriptPath = takeOption("--script", from: &arguments).map(expandedPath)
+        let scriptPath = try takeOption("--script", from: &arguments).map(expandedPath)
+        try ensureNoArguments(arguments)
         let payload = try loadPayload(at: payloadPath)
         let scriptURL = try scriptPath.map(URL.init(fileURLWithPath:)) ?? bundledFillScript()
         try FeedbackAssistantApp.fill(payload: payload, scriptURL: scriptURL, selectPopups: selectPopups)
-        if !selectPopups {
+        if selectPopups {
+            print("Set fields and selected requested popups. Review any native-only required fields or diagnostics before submitting.")
+        } else {
             print("Set text fields. Select native popups if needed: area='\(payload.category.area)', kind='\(payload.kind.rawValue)'")
         }
     }
 
     static func runSubmit(_ rawArguments: [String]) throws {
         var arguments = rawArguments
-        let payloadPath = expandedPath(takeOption("--payload", from: &arguments) ?? "feedback-submission.json")
+        let payloadPath = expandedPath(try takeOption("--payload", from: &arguments) ?? "feedback-submission.json")
         let selectPopups = takeFlag("--select-popups", from: &arguments)
         let confirmSubmit = takeFlag("--confirm", from: &arguments)
-        let scriptPath = takeOption("--script", from: &arguments).map(expandedPath)
-        let waitSeconds = Double(takeOption("--wait-seconds", from: &arguments) ?? "1.5") ?? 1.5
+        let scriptPath = try takeOption("--script", from: &arguments).map(expandedPath)
+        let waitSeconds = try parseSeconds(try takeOption("--wait-seconds", from: &arguments) ?? "1.5", flag: "--wait-seconds")
         let verifyStore = takeFlag("--verify-store", from: &arguments) || confirmSubmit
-        let verifyWaitSeconds = Double(takeOption("--verify-wait-seconds", from: &arguments) ?? "3.0") ?? 3.0
+        let verifyWaitSeconds = try parseSeconds(try takeOption("--verify-wait-seconds", from: &arguments) ?? "3.0", flag: "--verify-wait-seconds")
         let dryRun = takeFlag("--dry-run", from: &arguments)
-        let dbPath = takeOption("--db", from: &arguments) ?? FeedbackStore.defaultPath
+        let dbPath = try takeOption("--db", from: &arguments) ?? FeedbackStore.defaultPath
+        try ensureNoArguments(arguments)
         let payload = try loadPayload(at: payloadPath)
-        guard let url = URL(string: payload.url) else {
-            throw RelatoError.invalidArgument("Payload URL is invalid")
-        }
+        let url = try feedbackURL(from: payload)
 
         if dryRun {
             printSubmitPlan(
@@ -210,7 +222,7 @@ enum RelatoCLI {
         if confirmSubmit {
             print("Submit click requested through the native Feedback Assistant UI.")
         } else {
-            print("Opened and filled Feedback Assistant. Re-run with --confirm to click the native Submit button.")
+            print("Opened and filled Feedback Assistant. Review any native-only required fields or diagnostics, then re-run with --confirm to click the native Submit button.")
         }
 
         if verifyStore {
@@ -225,7 +237,23 @@ enum RelatoCLI {
             throw RelatoError.missingFile(path)
         }
         let data = try Data(contentsOf: URL(fileURLWithPath: path))
-        return try JSONDecoder().decode(PreparedFeedback.self, from: data)
+        do {
+            return try JSONDecoder().decode(PreparedFeedback.self, from: data)
+        } catch {
+            throw RelatoError.invalidArgument("Could not decode payload at \(path): \(friendlyDecodeError(error))")
+        }
+    }
+
+    static func feedbackURL(from payload: PreparedFeedback) throws -> URL {
+        guard
+            let components = URLComponents(string: payload.url),
+            components.scheme == "https",
+            components.host == "feedbackassistant.apple.com",
+            let url = components.url
+        else {
+            throw RelatoError.invalidArgument("Payload URL must be an https://feedbackassistant.apple.com URL")
+        }
+        return url
     }
 
     static func bundledFillScript() throws -> URL {
@@ -235,15 +263,17 @@ enum RelatoCLI {
         throw RelatoError.missingFile("feedback_native_fill.applescript")
     }
 
-    static func takeOption(_ name: String, from arguments: inout [String]) -> String? {
+    static func takeOption(_ name: String, from arguments: inout [String]) throws -> String? {
         guard let index = arguments.firstIndex(of: name) else { return nil }
         arguments.remove(at: index)
-        guard index < arguments.count else { return nil }
+        guard index < arguments.count, !arguments[index].hasPrefix("--") else {
+            throw RelatoError.missingValue(name)
+        }
         return arguments.remove(at: index)
     }
 
     static func requireOption(_ name: String, from arguments: inout [String]) throws -> String {
-        guard let value = takeOption(name, from: &arguments), !value.isEmpty else {
+        guard let value = try takeOption(name, from: &arguments), !value.isEmpty else {
             throw RelatoError.missingValue(name)
         }
         return value
@@ -253,6 +283,42 @@ enum RelatoCLI {
         guard let index = arguments.firstIndex(of: name) else { return false }
         arguments.remove(at: index)
         return true
+    }
+
+    static func ensureNoArguments(_ arguments: [String]) throws {
+        guard arguments.isEmpty else {
+            throw RelatoError.invalidArgument("Unexpected argument(s): \(arguments.joined(separator: " "))")
+        }
+    }
+
+    static func parseLimit(_ value: String) throws -> Int {
+        guard let limit = Int(value), limit >= 0 else {
+            throw RelatoError.invalidArgument("Invalid value for --limit: \(value). Expected a non-negative integer.")
+        }
+        return limit
+    }
+
+    static func parseSeconds(_ value: String, flag: String) throws -> Double {
+        guard let seconds = Double(value), seconds >= 0 else {
+            throw RelatoError.invalidArgument("Invalid value for \(flag): \(value). Expected a non-negative number.")
+        }
+        return seconds
+    }
+
+    static func friendlyDecodeError(_ error: Error) -> String {
+        if case let DecodingError.dataCorrupted(context) = error {
+            return context.debugDescription
+        }
+        if case let DecodingError.keyNotFound(key, _) = error {
+            return "missing key '\(key.stringValue)'"
+        }
+        if case let DecodingError.valueNotFound(_, context) = error {
+            return "missing value at \(context.codingPath.map(\.stringValue).joined(separator: "."))"
+        }
+        if case let DecodingError.typeMismatch(_, context) = error {
+            return "type mismatch at \(context.codingPath.map(\.stringValue).joined(separator: "."))"
+        }
+        return error.localizedDescription
     }
 
     static func expandedPath(_ path: String) -> String {
@@ -365,7 +431,7 @@ enum RelatoCLI {
               relato open ROUTE [--id ID] [--print-only]
               relato open-native [--payload PATH]
               relato fill [--payload PATH] [--select-popups] [--script PATH]
-              relato submit [--payload PATH] [--select-popups] [--wait-seconds N] [--confirm] [--verify-store] [--dry-run]
+              relato submit [--payload PATH] [--select-popups] [--script PATH] [--wait-seconds N] [--verify-wait-seconds N] [--db PATH] [--confirm] [--verify-store] [--dry-run]
             """
         )
     }

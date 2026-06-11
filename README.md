@@ -118,6 +118,8 @@ Without `--confirm`, `relato submit` opens and fills Feedback Assistant, then st
 
 With `--confirm`, RelatoKit uses the signed-in native app to submit through the visible UI, then performs best-effort local store verification. This check can show local store changes and matching recent items, but it is not a server-side receipt from Apple.
 
+Feedback Assistant may add required native-only fields based on the selected topic, such as Xcode version, device details, logs, or sysdiagnose attachments. Review those fields in the app before using `--confirm`.
+
 ## Commands
 
 ```sh
@@ -131,7 +133,7 @@ relato routes
 relato open ROUTE [--id ID] [--print-only]
 relato open-native [--payload PATH]
 relato fill [--payload PATH] [--select-popups] [--script PATH]
-relato submit [--payload PATH] [--select-popups] [--wait-seconds N] [--confirm] [--verify-store] [--dry-run]
+relato submit [--payload PATH] [--select-popups] [--script PATH] [--wait-seconds N] [--verify-wait-seconds N] [--db PATH] [--confirm] [--verify-store] [--dry-run]
 relato version
 ```
 
