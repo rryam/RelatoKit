@@ -66,7 +66,7 @@ RelatoKit gives you a small command-line workflow around the native Feedback Ass
 - topic and area inference from title, description, and bundle identifier
 - JSON and Markdown report preparation
 - native Feedback Assistant route launching
-- AX-driven title, description, bundle ID, passive pop-up, and submit handoff
+- AX-driven title, description, bundle ID, fail-closed popup handling, and submit handoff
 - background local attachment staging into Feedback Assistant draft folders
 - fail-closed behavior when native controls require focus, keyboard, or pointer ownership
 
@@ -124,11 +124,11 @@ relato submit --payload feedback-submission.json --dry-run
 relato submit --payload feedback-submission.json --confirm
 ```
 
-Without `--confirm`, `relato submit` opens and fills Feedback Assistant, then stops before clicking the native Submit button.
+Without `--confirm`, `relato submit` opens Feedback Assistant without activation, fills the fields it can safely set, hides the app again, stages the snapshot, and stops before Submit.
 
 With `--confirm`, RelatoKit asks the signed-in native app to press Submit through Accessibility, then performs best-effort local store verification. This check can show local store changes and matching recent items, but it is not a server-side receipt from Apple.
 
-Feedback Assistant may add required native-only fields based on the selected topic, such as Xcode version, device details, logs, or sysdiagnose attachments. Review those fields in the app before using `--confirm`.
+Feedback Assistant may add required native-only fields based on the selected topic, such as popups, Xcode version, device details, logs, or sysdiagnose attachments. Review those fields in the app before using `--confirm`.
 
 ## Commands
 
@@ -160,9 +160,19 @@ Native form automation uses an Objective-C Accessibility engine with hidden nati
 
 For the automation model, see [docs/AX_AUTOMATION.md](docs/AX_AUTOMATION.md).
 
+## Background Boundary
+
+RelatoKit's hidden handoff was tested against the stronger background-input approach used by [Cua](https://github.com/trycua/cua) and [Peekaboo](https://github.com/openclaw/Peekaboo). Those tools are useful references for macOS agent automation: process-targeted input, hidden window inspection, direct AX value writes, and focus-without-raise patterns.
+
+What helped here: Cua confirmed that hidden Feedback Assistant text fields can be set and rendered without foregrounding the app. RelatoKit keeps that behavior in-tree through direct AX value writes and hidden app lifecycle handling.
+
+What did not work: Feedback Assistant's SwiftUI popups expose no selectable AX children while hidden, and process-targeted keyboard or click delivery did not select them reliably. `--select-popups` therefore fails closed. Agents should leave those fields for native review instead of taking over the user's keyboard, pointer, or active app.
+
+Server receipt boundary: local store verification is local evidence only. It can show drafts, submitted-looking local items, and upload-task deltas, but only Apple's Feedback Assistant UI or Apple-side state can prove server acceptance.
+
 ## Current Status
 
-RelatoKit is a pre-1.0 package focused on local store inspection, report preparation, native app launch, hidden native form entry, explicit native UI submission, local file attachment staging, and best-effort local verification. `relato submit --confirm` is native app automation; it is not private headless submission. Same-desktop background filling uses passive AX value writes where Feedback Assistant accepts them. Feedback Assistant's SwiftUI popups may expose no selectable AX children while hidden; RelatoKit fails closed there instead of taking over the user's keyboard or pointer. Local file attachments are copied into the current Feedback Assistant draft folder after the native draft is created; RelatoKit does not drive the visible Add Attachment picker.
+RelatoKit is a pre-1.0 package focused on local store inspection, report preparation, native app launch, hidden native form entry, explicit native UI submission, local file attachment staging, and best-effort local verification. `relato submit --confirm` is native app automation; it is not private headless submission. Same-desktop background filling uses passive AX value writes where Feedback Assistant accepts them. Feedback Assistant's SwiftUI popups may expose no selectable AX children while hidden; RelatoKit fails closed there instead of taking over the user's keyboard or pointer. Local file attachments are copied into the current Feedback Assistant draft folder after the native draft is created; RelatoKit does not drive the visible Add Attachment picker. Local store verification is not an Apple server receipt.
 
 The package also includes `Research/feedbackd_probe.m`, an exploratory probe for Feedback Assistant private framework discovery. The first live XPC spike against `feedbackd` hit an entitlement refusal at listener level, and that boundary is respected by the CLI.
 
@@ -187,7 +197,6 @@ make check
 
 - [docs/COMMANDS.md](docs/COMMANDS.md) - generated command reference
 - [docs/AX_AUTOMATION.md](docs/AX_AUTOMATION.md) - native Accessibility automation notes
-- [CHANGELOG.md](CHANGELOG.md) - release notes
 - [CONTRIBUTING.md](CONTRIBUTING.md) - development workflow
 - [SUPPORT.md](SUPPORT.md) - support checklist
 - [SECURITY.md](SECURITY.md) - security reporting and project boundary

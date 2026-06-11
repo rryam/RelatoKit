@@ -183,7 +183,7 @@ enum RelatoCLI {
         let payload = try loadPayload(at: payloadPath)
         let fillResult = try FeedbackAssistantApp.fill(payload: payload, selectPopups: selectPopups)
         if selectPopups {
-            print("Set fields and selected requested popups through Accessibility. Review any native-only required fields or diagnostics before submitting.")
+            print("Set fields and selected requested popups through Accessibility. Review native-only fields and remember local verification is not an Apple server receipt.")
         } else {
             print("Set fields through Accessibility. Select native popups if needed: area='\(payload.category.area)', kind='\(payload.kind.rawValue)'")
         }
@@ -500,6 +500,8 @@ enum RelatoCLI {
               Feedback Assistant is opened without activation and hidden after launch/fill.
               Snapshot attachments are staged into the local Feedback Assistant draft
               folder in the background after the native draft exists.
+              Cua/Peekaboo-style background input was tested: hidden text fields work,
+              Feedback Assistant SwiftUI popups still fail closed.
             """
         )
     }
@@ -580,6 +582,8 @@ enum RelatoCLI {
               foregrounding Feedback Assistant when a native control refuses background automation.
               Feedback Assistant's SwiftUI popups can expose no selectable AX children while
               hidden; in that case `--select-popups` fails closed instead of taking over input.
+              Cua/Peekaboo-style background input was tested and kept as a boundary:
+              useful for hidden text-field validation, not reliable for these popups.
 
             Agent pattern:
               relato submit --payload feedback-submission.json --dry-run --confirm
@@ -605,9 +609,9 @@ enum RelatoCLI {
               agent has already navigated the native app, manually selected a topic, or
               needs to retry form fill after changing native-only fields.
 
-              --select-popups asks the AX driver to select known area/type popups. Some
-              Apple forms use topic-specific popup labels and supported values, so
-              inspect the native UI afterward.
+              --select-popups asks the AX driver to select known area/type popups. Feedback
+              Assistant SwiftUI popups may expose no selectable AX children while hidden;
+              when that happens RelatoKit fails closed instead of stealing input.
             """
         )
     }

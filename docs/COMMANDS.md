@@ -8,10 +8,10 @@ This file is generated from live CLI help output. RelatoKit is optimized for age
 2. Run `relato prepare` to create `feedback-submission.json` and `feedback-submission.md`.
 3. Inspect both files before touching the native app.
 4. Run `relato submit --dry-run --payload feedback-submission.json`.
-5. Run `relato submit --payload feedback-submission.json` to open and fill only.
-6. Inspect Feedback Assistant for native-only fields, diagnostics, and staged attachments.
+5. Run `relato submit --payload feedback-submission.json` to open hidden, fill safe fields, stage attachments, and stop before Submit.
+6. Inspect Feedback Assistant for native-only fields, popups, diagnostics, and staged attachments.
 7. Use `--confirm` only after explicit user confirmation.
-8. Use `relato store list` and `relato store uploads` as local evidence afterward.
+8. Use `relato store list` and `relato store uploads` as local evidence afterward; they are not Apple server receipts.
 
 ## Payload Contract
 
@@ -69,6 +69,8 @@ Safety:
   Feedback Assistant is opened without activation and hidden after launch/fill.
   Snapshot attachments are staged into the local Feedback Assistant draft
   folder in the background after the native draft exists.
+  Cua/Peekaboo-style background input was tested: hidden text fields work,
+  Feedback Assistant SwiftUI popups still fail closed.
 ```
 
 To regenerate:
@@ -206,6 +208,8 @@ Native form reality:
   foregrounding Feedback Assistant when a native control refuses background automation.
   Feedback Assistant's SwiftUI popups can expose no selectable AX children while
   hidden; in that case `--select-popups` fails closed instead of taking over input.
+  Cua/Peekaboo-style background input was tested and kept as a boundary:
+  useful for hidden text-field validation, not reliable for these popups.
 
 Agent pattern:
   relato submit --payload feedback-submission.json --dry-run --confirm
@@ -229,9 +233,9 @@ Notes:
   agent has already navigated the native app, manually selected a topic, or
   needs to retry form fill after changing native-only fields.
 
-  --select-popups asks the AX driver to select known area/type popups. Some
-  Apple forms use topic-specific popup labels and supported values, so
-  inspect the native UI afterward.
+  --select-popups asks the AX driver to select known area/type popups. Feedback
+  Assistant SwiftUI popups may expose no selectable AX children while hidden;
+  when that happens RelatoKit fails closed instead of stealing input.
 ```
 
 ### `relato help store`
@@ -262,3 +266,4 @@ Notes:
 - Use `relato open ROUTE --print-only` when you only need the Feedback Assistant URL.
 - Use `relato store summary` and `relato store list` for local verification after native submission.
 - Treat local store verification as local evidence, not an Apple server receipt.
+- `--select-popups` fails closed when Feedback Assistant exposes no selectable hidden AX children.

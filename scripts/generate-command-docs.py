@@ -58,10 +58,10 @@ def render(commands: list[str], global_help: str, topic_help: dict[str, str]) ->
         "2. Run `relato prepare` to create `feedback-submission.json` and `feedback-submission.md`.",
         "3. Inspect both files before touching the native app.",
         "4. Run `relato submit --dry-run --payload feedback-submission.json`.",
-        "5. Run `relato submit --payload feedback-submission.json` to open and fill only.",
-        "6. Inspect Feedback Assistant for native-only fields, diagnostics, and staged attachments.",
+        "5. Run `relato submit --payload feedback-submission.json` to open hidden, fill safe fields, stage attachments, and stop before Submit.",
+        "6. Inspect Feedback Assistant for native-only fields, popups, diagnostics, and staged attachments.",
         "7. Use `--confirm` only after explicit user confirmation.",
-        "8. Use `relato store list` and `relato store uploads` as local evidence afterward.",
+        "8. Use `relato store list` and `relato store uploads` as local evidence afterward; they are not Apple server receipts.",
         "",
         "## Payload Contract",
         "",
@@ -114,6 +114,7 @@ def render(commands: list[str], global_help: str, topic_help: dict[str, str]) ->
             "- Use `relato open ROUTE --print-only` when you only need the Feedback Assistant URL.",
             "- Use `relato store summary` and `relato store list` for local verification after native submission.",
             "- Treat local store verification as local evidence, not an Apple server receipt.",
+            "- `--select-popups` fails closed when Feedback Assistant exposes no selectable hidden AX children.",
             "",
         ]
     )

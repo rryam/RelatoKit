@@ -8,7 +8,7 @@ The AX driver works by:
 2. Reading windows and descendants from the Accessibility tree.
 3. Matching controls by role, title, description, and value.
 4. Attempting text fields and text areas through `AXValue`.
-5. Using passive `AXValue` writes for text fields and exposed popups.
+5. Using passive `AXValue` writes for text fields and trying exposed popup values only when Feedback Assistant accepts them.
 6. Avoiding synthetic mouse events, keyboard events, pasteboard writes, and focus reassignment.
 7. Failing closed when a native control requires active focus or pointer ownership.
 8. Staging local snapshots into the active Feedback Assistant draft folder after the native draft exists.
@@ -24,7 +24,7 @@ AX can drive many native controls without AppleScript:
 - set bundle identifier fields when the form exposes them
 - choose topic rows
 - press Continue and Submit buttons
-- passively set exposed pop-up values when Feedback Assistant accepts direct AX values
+- fail closed on popups when Feedback Assistant exposes no selectable hidden AX children
 - stage local evidence files into Feedback Assistant's local draft folder
 
 ## Practical Limits
@@ -33,7 +33,9 @@ AX is still native UI automation. It depends on the target app exposing useful A
 
 If passive AX mutation fails, RelatoKit fails closed. The production CLI should preserve the user's current app and report the unsupported native-control boundary.
 
-We tested the stronger macOS background-input pattern used by tools such as Cua and Peekaboo: SkyLight per-PID event posting, focus-without-raise, AX direct value setting, and process-targeted keyboard events. That route can mutate and render hidden Feedback Assistant text fields, but Feedback Assistant's SwiftUI popups expose no selectable children while hidden and did not accept hidden process-targeted keyboard selection. RelatoKit therefore keeps popups fail-closed instead of stealing focus.
+We tested the stronger macOS background-input pattern used by tools such as [Cua](https://github.com/trycua/cua) and [Peekaboo](https://github.com/openclaw/Peekaboo): hidden window inspection, SkyLight per-PID event posting, focus-without-raise, AX direct value setting, and process-targeted keyboard events. That route can mutate and render hidden Feedback Assistant text fields, which validates RelatoKit's hidden text-field strategy. It did not make Feedback Assistant's SwiftUI popups selectable while hidden: those popups exposed no selectable AX children and did not accept hidden process-targeted keyboard selection. RelatoKit therefore keeps popups fail-closed instead of stealing focus.
+
+RelatoKit does not shell out to Cua or Peekaboo at runtime. Their implementations informed the boundary test and the no-input-stealing design; RelatoKit keeps the production path small and local.
 
 Some forms do not support every report kind. For example, a macOS form can accept `Incorrect/Unexpected Behavior` while rejecting `Suggestion` for its type popup. In those cases RelatoKit reports the failing native value instead of pretending the form was completed.
 
