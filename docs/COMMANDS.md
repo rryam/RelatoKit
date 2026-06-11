@@ -200,8 +200,8 @@ Native form reality:
   RelatoKit uses an Objective-C Accessibility/CoreGraphics engine for native UI automation.
   Text is routed through process-targeted CoreGraphics events. Snapshot attachments
   are staged into the local Feedback Assistant draft folder after the native draft
-  exists, avoiding the foreground-only Add Attachment picker. Foreground fallback is
-  opt-in with RELATO_ALLOW_FOREGROUND_FALLBACK=1 for local experiments.
+  exists, avoiding the Add Attachment picker. RelatoKit fails closed instead of
+  foregrounding Feedback Assistant when a native control refuses background automation.
 
 Agent pattern:
   relato submit --payload feedback-submission.json --dry-run --confirm

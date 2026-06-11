@@ -18,7 +18,7 @@ public enum FeedbackAssistantApp {
         attachmentDraftID: String? = nil,
         storePath: String = FeedbackStore.defaultPath
     ) throws -> FillResult {
-        let shouldStageAttachment = payload.snapshot?.isEmpty == false && !allowsForegroundFallback
+        let shouldStageAttachment = payload.snapshot?.isEmpty == false
         if shouldStageAttachment && confirmSubmit {
             try runNativeFill(payload: payload, snapshot: "", selectPopups: selectPopups, confirmSubmit: false)
             let attachment = try FeedbackDraftAttachmentStager.stage(
@@ -38,11 +38,6 @@ public enum FeedbackAssistantApp {
             storePath: storePath
         ) : nil
         return FillResult(stagedAttachment: attachment)
-    }
-
-    private static var allowsForegroundFallback: Bool {
-        ProcessInfo.processInfo.environment["RELATO_ALLOW_FOREGROUND_FALLBACK"] == "1"
-            && ProcessInfo.processInfo.environment["RELATO_DISABLE_FOREGROUND_FALLBACK"] != "1"
     }
 
     private static func runNativeFill(

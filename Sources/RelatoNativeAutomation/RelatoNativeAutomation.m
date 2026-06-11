@@ -9,14 +9,6 @@ static NSString *RFAString(const char *value) {
     return [NSString stringWithUTF8String:value] ?: @"";
 }
 
-static BOOL RFADisableForegroundFallback(void) {
-    NSDictionary<NSString *, NSString *> *environment = [[NSProcessInfo processInfo] environment];
-    if ([environment[@"RELATO_DISABLE_FOREGROUND_FALLBACK"] isEqualToString:@"1"]) {
-        return YES;
-    }
-    return ![environment[@"RELATO_ALLOW_FOREGROUND_FALLBACK"] isEqualToString:@"1"];
-}
-
 static int RFAFail(char **errorOut, NSString *message) {
     if (errorOut != NULL) {
         *errorOut = strdup(message.UTF8String);
@@ -243,29 +235,6 @@ static AXUIElementRef RFAFindButton(AXUIElementRef root, NSString *name) {
     });
 }
 
-static AXUIElementRef RFAFindVisibleButton(AXUIElementRef root, NSString *name) {
-    __block AXUIElementRef best = NULL;
-    __block CGFloat bestY = CGFLOAT_MAX;
-    RFAFindDescendant(root, ^BOOL(AXUIElementRef element) {
-        if (![RFARole(element) isEqualToString:NSAccessibilityButtonRole] || !RFAMatches(element, name)) {
-            return NO;
-        }
-        CGPoint origin = CGPointZero;
-        CGSize size = CGSizeZero;
-        if (!RFAPointAndSize(element, &origin, &size) || size.width <= 0 || size.height <= 0) {
-            return NO;
-        }
-        if (origin.y < bestY) {
-            if (best != NULL) { CFRelease(best); }
-            best = element;
-            CFRetain(best);
-            bestY = origin.y;
-        }
-        return NO;
-    });
-    return best;
-}
-
 static BOOL RFAPointAndSize(AXUIElementRef element, CGPoint *point, CGSize *size) {
     CFTypeRef positionValue = NULL;
     CFTypeRef sizeValue = NULL;
@@ -288,63 +257,6 @@ static BOOL RFAPointAndSize(AXUIElementRef element, CGPoint *point, CGSize *size
 
 static CGPoint RFAMouseEventPoint(CGPoint point) {
     return point;
-}
-
-static BOOL RFAClickElement(AXUIElementRef element) {
-    CGPoint origin = CGPointZero;
-    CGSize size = CGSizeZero;
-    if (!RFAPointAndSize(element, &origin, &size)) { return NO; }
-    CGPoint point = RFAMouseEventPoint(CGPointMake(origin.x + size.width / 2.0, origin.y + size.height / 2.0));
-    CGEventRef down = CGEventCreateMouseEvent(NULL, kCGEventLeftMouseDown, point, kCGMouseButtonLeft);
-    CGEventRef up = CGEventCreateMouseEvent(NULL, kCGEventLeftMouseUp, point, kCGMouseButtonLeft);
-    if (down == NULL || up == NULL) {
-        if (down != NULL) { CFRelease(down); }
-        if (up != NULL) { CFRelease(up); }
-        return NO;
-    }
-    CGEventPost(kCGHIDEventTap, down);
-    CGEventPost(kCGHIDEventTap, up);
-    CFRelease(down);
-    CFRelease(up);
-    [NSThread sleepForTimeInterval:0.2];
-    return YES;
-}
-
-static BOOL RFAClickElementAtRatio(AXUIElementRef element, CGFloat xRatio, CGFloat yRatio) {
-    CGPoint origin = CGPointZero;
-    CGSize size = CGSizeZero;
-    if (!RFAPointAndSize(element, &origin, &size)) { return NO; }
-    CGPoint point = RFAMouseEventPoint(CGPointMake(origin.x + size.width * xRatio, origin.y + size.height * yRatio));
-    CGEventRef down = CGEventCreateMouseEvent(NULL, kCGEventLeftMouseDown, point, kCGMouseButtonLeft);
-    CGEventRef up = CGEventCreateMouseEvent(NULL, kCGEventLeftMouseUp, point, kCGMouseButtonLeft);
-    if (down == NULL || up == NULL) {
-        if (down != NULL) { CFRelease(down); }
-        if (up != NULL) { CFRelease(up); }
-        return NO;
-    }
-    CGEventPost(kCGHIDEventTap, down);
-    CGEventPost(kCGHIDEventTap, up);
-    CFRelease(down);
-    CFRelease(up);
-    [NSThread sleepForTimeInterval:0.2];
-    return YES;
-}
-
-static BOOL RFAClickPoint(CGPoint point) {
-    point = RFAMouseEventPoint(point);
-    CGEventRef down = CGEventCreateMouseEvent(NULL, kCGEventLeftMouseDown, point, kCGMouseButtonLeft);
-    CGEventRef up = CGEventCreateMouseEvent(NULL, kCGEventLeftMouseUp, point, kCGMouseButtonLeft);
-    if (down == NULL || up == NULL) {
-        if (down != NULL) { CFRelease(down); }
-        if (up != NULL) { CFRelease(up); }
-        return NO;
-    }
-    CGEventPost(kCGHIDEventTap, down);
-    CGEventPost(kCGHIDEventTap, up);
-    CFRelease(down);
-    CFRelease(up);
-    [NSThread sleepForTimeInterval:0.25];
-    return YES;
 }
 
 static BOOL RFAClickElementAtRatioToPid(AXUIElementRef element, CGFloat xRatio, CGFloat yRatio, pid_t pid) {
@@ -375,30 +287,8 @@ static BOOL RFAClickElementToPid(AXUIElementRef element, pid_t pid) {
     return RFAClickElementAtRatioToPid(element, 0.5, 0.5, pid);
 }
 
-static BOOL RFAPressHitTestedElementAtRatio(AXUIElementRef element, CGFloat xRatio, CGFloat yRatio) {
-    CGPoint origin = CGPointZero;
-    CGSize size = CGSizeZero;
-    if (!RFAPointAndSize(element, &origin, &size)) { return NO; }
-
-    AXUIElementRef systemWide = AXUIElementCreateSystemWide();
-    AXUIElementRef hitElement = NULL;
-    CGPoint point = CGPointMake(origin.x + size.width * xRatio, origin.y + size.height * yRatio);
-    AXError error = AXUIElementCopyElementAtPosition(systemWide, point.x, point.y, &hitElement);
-    CFRelease(systemWide);
-    if (error != kAXErrorSuccess || hitElement == NULL) {
-        return NO;
-    }
-
-    BOOL pressed = RFAPress(hitElement);
-    CFRelease(hitElement);
-    return pressed;
-}
-
 static BOOL RFAPress(AXUIElementRef element) {
-    if (AXUIElementPerformAction(element, kAXPressAction) == kAXErrorSuccess) {
-        return YES;
-    }
-    return RFAClickElement(element);
+    return AXUIElementPerformAction(element, kAXPressAction) == kAXErrorSuccess;
 }
 
 static BOOL RFAPerformActionOnly(AXUIElementRef element, CFStringRef action) {
@@ -427,68 +317,10 @@ static BOOL RFAPerformActionOnElementOrChild(AXUIElementRef element, CFStringRef
     return NO;
 }
 
-static void RFARaiseWindow(AXUIElementRef window) {
-    if (window == NULL) { return; }
-    AXUIElementPerformAction(window, kAXRaiseAction);
-    AXUIElementSetAttributeValue(window, kAXMainAttribute, kCFBooleanTrue);
-    AXUIElementSetAttributeValue(window, kAXFocusedAttribute, kCFBooleanTrue);
-}
-
 static void RFAScrollElementToVisible(AXUIElementRef element) {
     if (element == NULL) { return; }
     AXUIElementPerformAction(element, CFSTR("AXScrollToVisible"));
     [NSThread sleepForTimeInterval:0.25];
-}
-
-static BOOL RFAPostCommandKey(CGKeyCode keyCode) {
-    CGEventRef down = CGEventCreateKeyboardEvent(NULL, keyCode, true);
-    CGEventRef up = CGEventCreateKeyboardEvent(NULL, keyCode, false);
-    if (down == NULL || up == NULL) {
-        if (down != NULL) { CFRelease(down); }
-        if (up != NULL) { CFRelease(up); }
-        return NO;
-    }
-    CGEventSetFlags(down, kCGEventFlagMaskCommand);
-    CGEventSetFlags(up, kCGEventFlagMaskCommand);
-    CGEventPost(kCGHIDEventTap, down);
-    CGEventPost(kCGHIDEventTap, up);
-    CFRelease(down);
-    CFRelease(up);
-    return YES;
-}
-
-static BOOL RFAPostModifiedKey(CGKeyCode keyCode, CGEventFlags flags) {
-    CGEventRef down = CGEventCreateKeyboardEvent(NULL, keyCode, true);
-    CGEventRef up = CGEventCreateKeyboardEvent(NULL, keyCode, false);
-    if (down == NULL || up == NULL) {
-        if (down != NULL) { CFRelease(down); }
-        if (up != NULL) { CFRelease(up); }
-        return NO;
-    }
-    CGEventSetFlags(down, flags);
-    CGEventSetFlags(up, flags);
-    CGEventPost(kCGHIDEventTap, down);
-    CGEventPost(kCGHIDEventTap, up);
-    CFRelease(down);
-    CFRelease(up);
-    return YES;
-}
-
-static BOOL RFAPostModifiedKeyToPid(CGKeyCode keyCode, CGEventFlags flags, pid_t pid) {
-    CGEventRef down = CGEventCreateKeyboardEvent(NULL, keyCode, true);
-    CGEventRef up = CGEventCreateKeyboardEvent(NULL, keyCode, false);
-    if (down == NULL || up == NULL) {
-        if (down != NULL) { CFRelease(down); }
-        if (up != NULL) { CFRelease(up); }
-        return NO;
-    }
-    CGEventSetFlags(down, flags);
-    CGEventSetFlags(up, flags);
-    RFAPostEventToPid(down, pid);
-    RFAPostEventToPid(up, pid);
-    CFRelease(down);
-    CFRelease(up);
-    return YES;
 }
 
 static BOOL RFAPostCommandKeyToPid(CGKeyCode keyCode, pid_t pid) {
@@ -555,28 +387,6 @@ static BOOL RFAPasteTargeted(NSString *value, AXUIElementRef input, AXUIElementR
     return ok && [RFAAttributeString(input, kAXValueAttribute) isEqualToString:value];
 }
 
-static BOOL RFAPasteForeground(NSString *value, AXUIElementRef input, NSRunningApplication *app) {
-    [app activateWithOptions:0];
-    [NSThread sleepForTimeInterval:0.3];
-    AXUIElementSetAttributeValue(input, kAXFocusedAttribute, kCFBooleanTrue);
-    AXUIElementPerformAction(input, kAXPressAction);
-    [NSThread sleepForTimeInterval:0.1];
-
-    NSPasteboard *pasteboard = NSPasteboard.generalPasteboard;
-    NSString *previous = [pasteboard stringForType:NSPasteboardTypeString];
-    [pasteboard clearContents];
-    [pasteboard setString:value forType:NSPasteboardTypeString];
-
-    BOOL ok = RFAPostCommandKey(0) && RFAPostCommandKey(9);
-    [NSThread sleepForTimeInterval:0.2];
-
-    [pasteboard clearContents];
-    if (previous != nil) {
-        [pasteboard setString:previous forType:NSPasteboardTypeString];
-    }
-    return ok;
-}
-
 static int RFASetText(AXUIElementRef root, NSString *label, NSString *value, AXUIElementRef appElement, NSRunningApplication *runningApp, char **errorOut) {
     AXUIElementRef input = RFAFindDescendant(root, ^BOOL(AXUIElementRef element) {
         return RFAIsTextInput(element) && RFAMatches(element, label);
@@ -593,72 +403,11 @@ static int RFASetText(AXUIElementRef root, NSString *label, NSString *value, AXU
     }
 
     RFAPasteTargeted(value, input, appElement, runningApp);
-    if (![RFAAttributeString(input, kAXValueAttribute) isEqualToString:value] && !RFADisableForegroundFallback()) {
-        RFAPasteForeground(value, input, runningApp);
-    }
     if (![RFAAttributeString(input, kAXValueAttribute) isEqualToString:value]) {
         return RFAFail(errorOut, [NSString stringWithFormat:@"Text input did not commit value for %@", label]);
     }
     CFRelease(input);
     return 0;
-}
-
-static BOOL RFAPostText(NSString *text) {
-    for (NSUInteger index = 0; index < text.length; index++) {
-        UniChar character = [text characterAtIndex:index];
-        CGEventRef down = CGEventCreateKeyboardEvent(NULL, 0, true);
-        CGEventRef up = CGEventCreateKeyboardEvent(NULL, 0, false);
-        if (down == NULL || up == NULL) {
-            if (down != NULL) { CFRelease(down); }
-            if (up != NULL) { CFRelease(up); }
-            return NO;
-        }
-        CGEventKeyboardSetUnicodeString(down, 1, &character);
-        CGEventKeyboardSetUnicodeString(up, 1, &character);
-        CGEventPost(kCGHIDEventTap, down);
-        CGEventPost(kCGHIDEventTap, up);
-        CFRelease(down);
-        CFRelease(up);
-    }
-    return YES;
-}
-
-static BOOL RFAPostKey(CGKeyCode keyCode) {
-    CGEventRef down = CGEventCreateKeyboardEvent(NULL, keyCode, true);
-    CGEventRef up = CGEventCreateKeyboardEvent(NULL, keyCode, false);
-    if (down == NULL || up == NULL) {
-        if (down != NULL) { CFRelease(down); }
-        if (up != NULL) { CFRelease(up); }
-        return NO;
-    }
-    CGEventPost(kCGHIDEventTap, down);
-    CGEventPost(kCGHIDEventTap, up);
-    CFRelease(down);
-    CFRelease(up);
-    return YES;
-}
-
-static BOOL RFAPostKeyToPid(CGKeyCode keyCode, pid_t pid) {
-    CGEventRef down = CGEventCreateKeyboardEvent(NULL, keyCode, true);
-    CGEventRef up = CGEventCreateKeyboardEvent(NULL, keyCode, false);
-    if (down == NULL || up == NULL) {
-        if (down != NULL) { CFRelease(down); }
-        if (up != NULL) { CFRelease(up); }
-        return NO;
-    }
-    RFAPostEventToPid(down, pid);
-    RFAPostEventToPid(up, pid);
-    CFRelease(down);
-    CFRelease(up);
-    return YES;
-}
-
-static BOOL RFASystemEventsKeyCode(CGKeyCode keyCode) {
-    NSString *script = [NSString stringWithFormat:@"tell application \"System Events\" to key code %hu", keyCode];
-    NSAppleScript *appleScript = [[NSAppleScript alloc] initWithSource:script];
-    NSDictionary *error = nil;
-    [appleScript executeAndReturnError:&error];
-    return error == nil;
 }
 
 static int RFASelectPopup(AXUIElementRef root, NSArray<NSString *> *labels, NSString *value, NSRunningApplication *runningApp, char **errorOut) {
@@ -682,13 +431,9 @@ static int RFASelectPopup(AXUIElementRef root, NSArray<NSString *> *labels, NSSt
         }
 
         RFAScrollElementToVisible(popup);
-        if (RFADisableForegroundFallback()) {
-            RFAPerformActionOnElementOrChild(popup, CFSTR("AXShowMenu"));
-            RFAClickElementToPid(popup, runningApp.processIdentifier);
-            RFAPerformActionOnElementOrChild(popup, kAXPressAction);
-        } else {
-            RFAPress(popup);
-        }
+        RFAPerformActionOnElementOrChild(popup, CFSTR("AXShowMenu"));
+        RFAClickElementToPid(popup, runningApp.processIdentifier);
+        RFAPerformActionOnElementOrChild(popup, kAXPressAction);
         [NSThread sleepForTimeInterval:0.5];
         AXUIElementRef systemWide = AXUIElementCreateSystemWide();
         AXUIElementRef searchRoots[] = { root, systemWide };
@@ -700,8 +445,7 @@ static int RFASelectPopup(AXUIElementRef root, NSArray<NSString *> *labels, NSSt
             });
             BOOL pressed = item != NULL &&
                 (RFAPressActionOnly(item) ||
-                 (RFADisableForegroundFallback() && RFAClickElementToPid(item, runningApp.processIdentifier)) ||
-                 (!RFADisableForegroundFallback() && RFAPress(item)));
+                 RFAClickElementToPid(item, runningApp.processIdentifier));
             if (pressed) {
                 [NSThread sleepForTimeInterval:0.25];
                 if ([RFAAttributeString(popup, kAXValueAttribute) rangeOfString:value options:NSCaseInsensitiveSearch].location != NSNotFound) {
@@ -716,268 +460,7 @@ static int RFASelectPopup(AXUIElementRef root, NSArray<NSString *> *labels, NSSt
         CFRelease(systemWide);
     }
 
-    if (RFADisableForegroundFallback()) {
-        return RFAFail(errorOut, [NSString stringWithFormat:@"Could not select popup value '%@' for %@ without foreground fallback", value, [labels componentsJoinedByString:@" / "]]);
-    }
-
-    [runningApp activateWithOptions:0];
-    [NSThread sleepForTimeInterval:0.2];
-    RFAPress(popup);
-    [NSThread sleepForTimeInterval:0.3];
-    RFAPostText(value);
-    RFAPostKey(36);
-    [NSThread sleepForTimeInterval:0.1];
-    RFAPostKey(36);
-    [NSThread sleepForTimeInterval:0.2];
-
-    if ([RFAAttributeString(popup, kAXValueAttribute) rangeOfString:value options:NSCaseInsensitiveSearch].location != NSNotFound) {
-        return 0;
-    }
-    return RFAFail(errorOut, [NSString stringWithFormat:@"Could not select popup value '%@' for %@", value, [labels componentsJoinedByString:@" / "]]);
-}
-
-static AXUIElementRef RFAFindAttachmentFileMenuItem(void) {
-    AXUIElementRef systemWide = AXUIElementCreateSystemWide();
-    NSArray<NSString *> *labels = @[@"Choose File", @"Add File"];
-    AXUIElementRef item = NULL;
-    for (NSInteger attempt = 0; attempt < 10 && item == NULL; attempt++) {
-        item = RFAFindDescendant(systemWide, ^BOOL(AXUIElementRef element) {
-            if (![RFARole(element) isEqualToString:NSAccessibilityMenuItemRole]) { return NO; }
-            for (NSString *label in labels) {
-                if (RFAMatches(element, label)) { return YES; }
-            }
-            return NO;
-        });
-        if (item == NULL) { [NSThread sleepForTimeInterval:0.1]; }
-    }
-    CFRelease(systemWide);
-    return item;
-}
-
-static BOOL RFASelectAttachmentFileMenuItem(AXUIElementRef root, NSRunningApplication *runningApp, char **errorOut) {
-    AXUIElementRef button = RFAFindVisibleButton(root, @"Add Attachment");
-    if (button == NULL) {
-        button = RFAFindButton(root, @"Add Attachment");
-    }
-    if (button == NULL) {
-        RFAFail(errorOut, @"Could not find Add Attachment button");
-        return NO;
-    }
-    CGPoint buttonOrigin = CGPointZero;
-    CGSize buttonSize = CGSizeZero;
-    BOOL hasButtonFrame = RFAPointAndSize(button, &buttonOrigin, &buttonSize);
-
-    RFAScrollElementToVisible(button);
-    hasButtonFrame = RFAPointAndSize(button, &buttonOrigin, &buttonSize);
-    AXUIElementRef item = NULL;
-
-    if (RFAPerformActionOnElementOrChild(button, CFSTR("AXShowMenu"))) {
-        [NSThread sleepForTimeInterval:0.6];
-        item = RFAFindAttachmentFileMenuItem();
-        if (item != NULL) {
-            BOOL pressed = RFAPressActionOnly(item);
-            CFRelease(item);
-            CFRelease(button);
-            if (!pressed) {
-                RFAFail(errorOut, @"Could not choose Add Attachment > Choose File");
-                return NO;
-            }
-            [NSThread sleepForTimeInterval:0.8];
-            return YES;
-        }
-    }
-
-    if (!RFAClickElementAtRatioToPid(button, 0.9, 0.5, runningApp.processIdentifier)) {
-        CFRelease(button);
-        RFAFail(errorOut, @"Could not press Add Attachment button");
-        return NO;
-    }
-    [NSThread sleepForTimeInterval:0.6];
-
-    item = RFAFindAttachmentFileMenuItem();
-    if (item != NULL) {
-        BOOL pressed = RFAPressActionOnly(item);
-        CFRelease(item);
-        CFRelease(button);
-        if (!pressed) {
-            RFAFail(errorOut, @"Could not choose Add Attachment > Choose File");
-            return NO;
-        }
-        [NSThread sleepForTimeInterval:0.8];
-        return YES;
-    }
-
-    if (RFAPerformActionOnElementOrChild(button, kAXPressAction)) {
-        [NSThread sleepForTimeInterval:0.6];
-        item = RFAFindAttachmentFileMenuItem();
-        if (item != NULL) {
-            BOOL pressed = RFAPressActionOnly(item);
-            CFRelease(item);
-            CFRelease(button);
-            if (!pressed) {
-                RFAFail(errorOut, @"Could not choose Add Attachment > Choose File");
-                return NO;
-            }
-            [NSThread sleepForTimeInterval:0.8];
-            return YES;
-        }
-    }
-
-    if (RFADisableForegroundFallback()) {
-        CFRelease(button);
-        RFAFail(errorOut, @"Could not open Add Attachment menu without foreground fallback");
-        return NO;
-    }
-
-    [runningApp activateWithOptions:0];
-    [NSThread sleepForTimeInterval:0.25];
-    RFARaiseWindow(root);
-    [NSThread sleepForTimeInterval:0.2];
-    RFAScrollElementToVisible(button);
-    hasButtonFrame = RFAPointAndSize(button, &buttonOrigin, &buttonSize);
-    if (!RFAClickElementAtRatio(button, 0.9, 0.5) &&
-        !RFAClickElementAtRatioToPid(button, 0.9, 0.5, runningApp.processIdentifier) &&
-        !RFAPressHitTestedElementAtRatio(button, 0.9, 0.5) &&
-        !RFAClickElementAtRatio(button, 0.9, 0.5)) {
-        CFRelease(button);
-        RFAFail(errorOut, @"Could not press Add Attachment button");
-        return NO;
-    }
-    CFRelease(button);
-    [NSThread sleepForTimeInterval:0.6];
-
-    item = RFAFindAttachmentFileMenuItem();
-    if (item == NULL) {
-        if (!hasButtonFrame) {
-            RFAFail(errorOut, @"Could not locate Add Attachment menu geometry");
-            return NO;
-        }
-        CGPoint chooseFilePoint = CGPointMake(buttonOrigin.x + buttonSize.width * 1.25, buttonOrigin.y + buttonSize.height * 2.8);
-        RFAClickPoint(chooseFilePoint);
-        [NSThread sleepForTimeInterval:0.8];
-        return YES;
-    }
-    BOOL pressed = RFAPressActionOnly(item);
-    CFRelease(item);
-    if (!pressed) {
-        RFAFail(errorOut, @"Could not choose Add Attachment > Choose File");
-        return NO;
-    }
-    [NSThread sleepForTimeInterval:0.8];
-    return YES;
-}
-
-static BOOL RFAPasteTextForeground(NSString *value) {
-    NSPasteboard *pasteboard = NSPasteboard.generalPasteboard;
-    NSString *previous = [pasteboard stringForType:NSPasteboardTypeString];
-    [pasteboard clearContents];
-    [pasteboard setString:value forType:NSPasteboardTypeString];
-
-    BOOL ok = RFAPostCommandKey(9);
-    [NSThread sleepForTimeInterval:0.2];
-
-    [pasteboard clearContents];
-    if (previous != nil) {
-        [pasteboard setString:previous forType:NSPasteboardTypeString];
-    }
-    return ok;
-}
-
-static BOOL RFAPasteTextToPid(NSString *value, pid_t pid) {
-    NSPasteboard *pasteboard = NSPasteboard.generalPasteboard;
-    NSString *previous = [pasteboard stringForType:NSPasteboardTypeString];
-    [pasteboard clearContents];
-    [pasteboard setString:value forType:NSPasteboardTypeString];
-
-    BOOL ok = RFAPostCommandKeyToPid(9, pid);
-    [NSThread sleepForTimeInterval:0.2];
-
-    [pasteboard clearContents];
-    if (previous != nil) {
-        [pasteboard setString:previous forType:NSPasteboardTypeString];
-    }
-    return ok;
-}
-
-static int RFANavigateOpenPanelToPath(AXUIElementRef picker, NSString *path, NSRunningApplication *runningApp, char **errorOut) {
-    RFAClickElementToPid(picker, runningApp.processIdentifier);
-    [NSThread sleepForTimeInterval:0.1];
-
-    RFAPostModifiedKeyToPid(5, kCGEventFlagMaskCommand | kCGEventFlagMaskShift, runningApp.processIdentifier);
-    [NSThread sleepForTimeInterval:0.3];
-    RFAPasteTextToPid(path, runningApp.processIdentifier);
-    RFAPostKeyToPid(36, runningApp.processIdentifier);
-    [NSThread sleepForTimeInterval:0.2];
-
-    AXUIElementRef pathField = RFAFindDescendant(picker, ^BOOL(AXUIElementRef element) {
-        return RFAIsTextInput(element) && RFAMatches(element, @"PathTextField");
-    });
-    if (pathField != NULL) {
-        CFRelease(pathField);
-        if (RFADisableForegroundFallback()) {
-            return RFAFail(errorOut, @"Attachment picker did not commit background Go to Folder input");
-        }
-        [runningApp activateWithOptions:0];
-        [NSThread sleepForTimeInterval:0.2];
-        RFAClickElement(picker);
-        [NSThread sleepForTimeInterval:0.1];
-        if (!RFAPostModifiedKey(5, kCGEventFlagMaskCommand | kCGEventFlagMaskShift)) {
-            return RFAFail(errorOut, @"Could not open Go to Folder in attachment picker");
-        }
-        [NSThread sleepForTimeInterval:0.3];
-        if (!RFAPasteTextForeground(path)) {
-            return RFAFail(errorOut, @"Could not paste attachment path into Go to Folder");
-        }
-        RFAPostKey(36);
-        [NSThread sleepForTimeInterval:0.2];
-        pathField = RFAFindDescendant(picker, ^BOOL(AXUIElementRef element) {
-            return RFAIsTextInput(element) && RFAMatches(element, @"PathTextField");
-        });
-        if (pathField != NULL) {
-            CFRelease(pathField);
-            RFASystemEventsKeyCode(36);
-        }
-    }
-    [NSThread sleepForTimeInterval:0.6];
-
-    AXUIElementRef openButton = NULL;
-    for (NSInteger attempt = 0; attempt < 10 && openButton == NULL; attempt++) {
-        openButton = RFAFindButton(picker, @"Attach");
-        if (openButton == NULL) { openButton = RFAFindButton(picker, @"Open"); }
-        if (openButton == NULL) { openButton = RFAFindButton(picker, @"Choose"); }
-        if (openButton == NULL) { [NSThread sleepForTimeInterval:0.1]; }
-    }
-    if (openButton == NULL || !RFAPress(openButton)) {
-        if (openButton != NULL) { CFRelease(openButton); }
-        return RFAFail(errorOut, @"Could not find attachment picker Attach button");
-    }
-    CFRelease(openButton);
-    [NSThread sleepForTimeInterval:0.6];
-    return 0;
-}
-
-static int RFAAttachFile(AXUIElementRef root, NSString *path, AXUIElementRef app, NSRunningApplication *runningApp, char **errorOut) {
-    if (!RFASelectAttachmentFileMenuItem(root, runningApp, errorOut)) {
-        return 1;
-    }
-
-    AXUIElementRef picker = RFAFindWindow(app, ^BOOL(AXUIElementRef window) {
-        BOOL hasPickerButton = RFAFindButton(window, @"Attach") != NULL || RFAFindButton(window, @"Open") != NULL || RFAFindButton(window, @"Choose") != NULL;
-        return hasPickerButton && (RFAMatches(window, @"Open") || RFAMatches(window, @"Choose") || RFAMatches(window, @"Attach"));
-    });
-    if (picker == NULL) {
-        picker = RFAFindDescendant(app, ^BOOL(AXUIElementRef element) {
-            BOOL hasPickerButton = RFAFindButton(element, @"Attach") != NULL || RFAFindButton(element, @"Open") != NULL || RFAFindButton(element, @"Choose") != NULL;
-            return hasPickerButton && (RFAMatches(element, @"Open") || RFAMatches(element, @"Choose") || RFAMatches(element, @"Attach") || [RFARole(element) isEqualToString:NSAccessibilitySheetRole]);
-        });
-    }
-    if (picker == NULL) {
-        return RFAFail(errorOut, @"Native file attachment picker did not open");
-    }
-
-    int result = RFANavigateOpenPanelToPath(picker, path, runningApp, errorOut);
-    CFRelease(picker);
-    return result;
+    return RFAFail(errorOut, [NSString stringWithFormat:@"Could not select popup value '%@' for %@ in background", value, [labels componentsJoinedByString:@" / "]]);
 }
 
 int RelatoFeedbackAssistantFill(
@@ -1059,12 +542,6 @@ int RelatoFeedbackAssistantFill(
         result = RFASelectPopup(window, @[@"Which area are you seeing an issue with?"], RFAString(area), runningApp, errorOut);
         if (result != 0) { CFRelease(app); return result; }
         result = RFASelectPopup(window, @[@"What type of feedback are you reporting?", @"What type of issue are you reporting?"], RFAString(kind), runningApp, errorOut);
-        if (result != 0) { CFRelease(app); return result; }
-    }
-
-    NSString *snapshotString = RFAString(snapshot);
-    if (snapshotString.length > 0) {
-        result = RFAAttachFile(window, snapshotString, app, runningApp, errorOut);
         if (result != 0) { CFRelease(app); return result; }
     }
 
