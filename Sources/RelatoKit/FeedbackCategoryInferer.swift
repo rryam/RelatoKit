@@ -23,6 +23,7 @@ public struct FeedbackCategoryInferer {
         var topic: String
         var tat: String
         var area: String
+        var classification: String
         var keywords: [String]
     }
 
@@ -32,15 +33,67 @@ public struct FeedbackCategoryInferer {
     public init(bundleMappingPath: String = Self.defaultBundleMappingPath) {
         self.bundleMappingPath = bundleMappingPath
         self.rules = [
-            Rule(topic: "Developer Technologies & SDKs", tat: "dev.tech", area: "Foundation Models Framework", keywords: ["foundation models", "foundationmodels", "language model", "generable", "tool calling"]),
-            Rule(topic: "Developer Tools & Resources", tat: "developertools.fba", area: "Xcode", keywords: ["xcode", "testflight", "app store connect", "simulator", "xctest", "swift compiler", "developer tools"]),
-            Rule(topic: "Developer Technologies & SDKs", tat: "dev.tech", area: "APIs and Frameworks", keywords: ["swiftui", "uikit", "appkit", "foundation", "framework", "api", "sdk", "swiftdata"]),
-            Rule(topic: "macOS", tat: "public.macos", area: "Something else not on this list", keywords: ["macos", "finder", "safari", "mail", "notes", "desktop", "system settings"]),
-            Rule(topic: "iOS & iPadOS", tat: "public.ios", area: "Something else not on this list", keywords: ["ios", "ipados", "iphone", "ipad", "uikit"]),
-            Rule(topic: "watchOS", tat: "watchos.public", area: "Something else not on this list", keywords: ["watchos", "apple watch", "watch"]),
-            Rule(topic: "tvOS", tat: "tvos.public", area: "Something else not on this list", keywords: ["tvos", "apple tv"]),
-            Rule(topic: "visionOS", tat: "public.visionOS", area: "Something else not on this list", keywords: ["visionos", "vision pro", "visionpro"]),
-            Rule(topic: "Feedback Assistant", tat: "developertools.fba", area: "Feedback Assistant", keywords: ["feedback assistant", "feedbackassistant", "fb"])
+            Self.developerTechnology("Foundation Models Framework", "seed:foundationmodelsframework", ["foundation models", "foundationmodels", "language model", "generable", "tool calling"]),
+            Self.developerTechnology("SwiftUI", "seed:swiftui", ["swiftui", "swift ui"]),
+            Self.developerTechnology("SwiftData", "seed:swiftdata", ["swiftdata", "swift data"]),
+            Self.developerTechnology("UIKit", "seed:uikit", ["uikit", "ui kit"]),
+            Self.developerTechnology("AppKit", "seed:appkit", ["appkit", "app kit"]),
+            Self.developerTechnology("StoreKit", "seed:storekit", ["storekit", "in-app purchase", "subscription"]),
+            Self.developerTechnology("CloudKit", "seed:cloudkit", ["cloudkit", "icloud container"]),
+            Self.developerTechnology("Core Data", "seed:coredata", ["core data", "coredata"]),
+            Self.developerTechnology("Core ML", "seed:coreml", ["core ml", "coreml"]),
+            Self.developerTechnology("AVFoundation", "seed:avfoundation", ["avfoundation", "av foundation", "camera capture"]),
+            Self.developerTechnology("Vision Framework", "seed:vision", ["vision framework", "vision request", "ocr", "barcode"]),
+            Self.developerTechnology("VisionKit", "seed:visionkit", ["visionkit", "vision kit", "document camera"]),
+            Self.developerTechnology("ScreenCaptureKit", "seed:screencapturekit", ["screencapturekit", "screen capture kit", "screen recording"]),
+            Self.developerTechnology("RealityKit", "seed:realitykit", ["realitykit", "reality kit"]),
+            Self.developerTechnology("Metal", "seed:metal", ["metal", "metal shader"]),
+            Self.developerTechnology("WebKit", "seed:webkit", ["webkit", "wkwebview"]),
+            Self.developerTechnology("WidgetKit", "seed:widgetkit", ["widgetkit", "widget kit"]),
+            Self.developerTechnology("ActivityKit", "seed:activitykit", ["activitykit", "activity kit", "live activities"]),
+            Self.developerTechnology("App Intents Framework", "seed:appintents", ["app intents", "appintents"]),
+            Self.developerTechnology("ExtensionKit", "seed:extensionkit", ["extensionkit", "extension kit"]),
+            Self.developerTechnology("MapKit", "seed:mapkit", ["mapkit", "map kit"]),
+            Self.developerTechnology("MusicKit", "seed:musickit", ["musickit", "music kit"]),
+            Self.developerTechnology("WeatherKit", "seed:weatherkit", ["weatherkit", "weather kit"]),
+
+            Self.developerTool("App Store Connect API", "seed:appstoreconnectAPI", ["app store connect api"]),
+            Self.developerTool("App Store Connect", "seedADC:appstoreconnect", ["app store connect"]),
+            Self.developerTool("TestFlight", "seedADC:testflight", ["testflight", "test flight"]),
+            Self.developerTool("Simulator", "seedADC:simulator", ["simulator", "simctl"]),
+            Self.developerTool("Instruments", "seed:instruments", ["instruments", "profiling", "time profiler"]),
+            Self.developerTool("Swift Compiler", "seedADC:swiftcompiler", ["swift compiler", "compiler crash"]),
+            Self.developerTool("Swift Testing Framework", "seed:swifttestingframework", ["swift testing", "testing framework"]),
+            Self.developerTool("Xcode Cloud", "seedx:xcodecloud", ["xcode cloud"]),
+            Self.developerTool("XCTest", "seedADC:XCtest", ["xctest", "ui test", "unit test"]),
+            Self.developerTool("Xcode", "seedx:xcode", ["xcode", "preview", "canvas", "source editor", "build system"]),
+            Self.developerTool("Feedback Assistant", "seedx:fba", ["feedback assistant", "feedbackassistant"]),
+            Self.developerTool("Developer Documentation", "seedADC:devpubs", ["developer documentation", "documentation"]),
+            Self.developerTool("DocC Documentation", "seedadc:documentationcompiler", ["docc", "documentation compiler"]),
+            Self.developerTool("SF Symbols", "seed:sfsymbols", ["sf symbols", "sfsymbols"]),
+            Self.developerTool("CreateML", "seedx:createML", ["createml", "create ml"]),
+            Self.developerTool("Developer Certificates, Identifiers, and Profiles", "seedadc:certificates", ["certificate", "provisioning profile", "bundle id", "identifier"]),
+            Self.developerTool("Developer Tools & Resources", "developertools.fba", ["developer tools"]),
+            Self.developerTechnology("APIs and Frameworks", "dev.tech", ["framework", "api", "sdk"]),
+
+            Self.macOSArea("Safari", "seedx:safari", ["safari"]),
+            Self.macOSArea("Mail", "seedx:mail", ["mail"]),
+            Self.macOSArea("Finder", "seedx:finder", ["finder"]),
+            Self.macOSArea("Wi-Fi", "seedx:wifi", ["wi-fi", "wifi"]),
+            Self.macOSArea("Bluetooth", "seedx:bluetooth", ["bluetooth"]),
+            Self.macOSArea("Photos", "seedx:photos", ["photos"]),
+            Self.macOSArea("Messages", "seedx:messages", ["messages", "imessage"]),
+            Self.macOSArea("iCloud", "seedx:icloud", ["icloud"]),
+            Self.macOSArea("System Settings", "seedx:systempreferences", ["system settings", "system preferences"]),
+            Self.macOSArea("Apple Intelligence", "seed:appleintelligence", ["apple intelligence"]),
+            Self.macOSArea("Image Playground", "seedmacos:imageplayground", ["image playground"]),
+            Self.macOSArea("Feedback Assistant", "seedx:fba", ["feedback assistant", "feedbackassistant"]),
+            Self.macOSArea("Something else not on this list", "public.macos", ["macos", "desktop"]),
+
+            Rule(topic: "iOS & iPadOS", tat: "public.ios", area: "Something else not on this list", classification: "public.ios", keywords: ["ios", "ipados", "iphone", "ipad"]),
+            Rule(topic: "watchOS", tat: "watchos.public", area: "Something else not on this list", classification: "watchos.public", keywords: ["watchos", "apple watch", "watch"]),
+            Rule(topic: "tvOS", tat: "tvos.public", area: "Something else not on this list", classification: "tvos.public", keywords: ["tvos", "apple tv"]),
+            Rule(topic: "visionOS", tat: "public.visionOS", area: "Something else not on this list", classification: "public.visionOS", keywords: ["visionos", "vision pro", "visionpro"])
         ]
     }
 
@@ -87,7 +140,7 @@ public struct FeedbackCategoryInferer {
                 topic: bestRule.topic,
                 tat: bestRule.tat,
                 area: bestRule.area,
-                classification: classification(for: bestRule),
+                classification: bestRule.classification,
                 reason: "matched \(bestScore) keyword(s)"
             )
         }
@@ -111,15 +164,33 @@ public struct FeedbackCategoryInferer {
         return mapping
     }
 
-    private func classification(for rule: Rule) -> String {
-        if rule.topic == "Developer Tools & Resources" {
-            return "seedx:xcode"
-        }
+    private static func developerTechnology(_ area: String, _ classification: String, _ keywords: [String]) -> Rule {
+        Rule(
+            topic: "Developer Technologies & SDKs",
+            tat: "dev.tech",
+            area: area,
+            classification: classification,
+            keywords: keywords
+        )
+    }
 
-        if rule.area == "Foundation Models Framework" {
-            return "seed:foundationmodelsframework"
-        }
+    private static func developerTool(_ area: String, _ classification: String, _ keywords: [String]) -> Rule {
+        Rule(
+            topic: "Developer Tools & Resources",
+            tat: "developertools.fba",
+            area: area,
+            classification: classification,
+            keywords: keywords
+        )
+    }
 
-        return rule.tat
+    private static func macOSArea(_ area: String, _ classification: String, _ keywords: [String]) -> Rule {
+        Rule(
+            topic: "macOS",
+            tat: "public.macos",
+            area: area,
+            classification: classification,
+            keywords: keywords
+        )
     }
 }
