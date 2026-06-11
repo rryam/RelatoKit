@@ -36,9 +36,7 @@ on run argv
       end if
 
       if shouldSelectPopups is "true" then
-        try
-          my choosePopup(targetScroll, "Which area are you seeing an issue with?", feedbackArea)
-        end try
+        my choosePopup(targetScroll, "Which area are you seeing an issue with?", feedbackArea)
 
         try
           my choosePopup(targetScroll, "What type of feedback are you reporting?", feedbackKind)
