@@ -155,13 +155,13 @@ relato help fill
 relato help store
 ```
 
-Native form automation uses macOS Accessibility APIs directly. There is no AppleScript engine and no separate background mode. RelatoKit drives the native app through AX elements, then stops for review unless `--confirm` is explicitly provided.
+Native form automation uses an Objective-C Accessibility/CoreGraphics engine. There is no AppleScript engine and no separate background mode. RelatoKit first attempts AX value writes; when Feedback Assistant does not commit those into its SwiftUI form, the CLI activates the app and uses public CoreGraphics paste events for the focused AX element. It stops for review unless `--confirm` is explicitly provided.
 
 For the automation model, see [docs/AX_AUTOMATION.md](docs/AX_AUTOMATION.md).
 
 ## Current Status
 
-RelatoKit is a pre-1.0 package focused on local store inspection, report preparation, native app launch, AX-driven native form entry, explicit native UI submission, and best-effort local verification. `relato submit --confirm` is native app automation; it is not private headless submission.
+RelatoKit is a pre-1.0 package focused on local store inspection, report preparation, native app launch, AX-driven native form entry, explicit native UI submission, and best-effort local verification. `relato submit --confirm` is native app automation; it is not private headless submission. Same-desktop background form filling is not currently reliable for Feedback Assistant because its SwiftUI controls expose settable AX values that do not commit while inactive. Local file attachment is form-dependent and currently fails closed when Feedback Assistant opens a diagnostics sheet instead of a file picker.
 
 The package also includes `Research/feedbackd_probe.m`, an exploratory probe for Feedback Assistant private framework discovery. It is not part of the Swift package build. The first live XPC spike against `feedbackd` hit an entitlement refusal at listener level, and that boundary is respected by the public CLI.
 

@@ -1,8 +1,9 @@
 import Foundation
+import RelatoNativeAutomation
 
 public enum FeedbackAssistantApp {
     public static func open(_ url: URL) throws {
-        try run("/usr/bin/open", arguments: ["-b", FeedbackRoutes.appBundleIdentifier, url.absoluteString])
+        try run("/usr/bin/open", arguments: ["-g", "-b", FeedbackRoutes.appBundleIdentifier, url.absoluteString])
     }
 
     public static func fill(
@@ -10,7 +11,27 @@ public enum FeedbackAssistantApp {
         selectPopups: Bool = false,
         confirmSubmit: Bool = false
     ) throws {
-        try FeedbackAssistantAXDriver().fill(payload: payload, selectPopups: selectPopups, confirmSubmit: confirmSubmit)
+        var errorMessage: UnsafeMutablePointer<CChar>?
+        let status = RelatoFeedbackAssistantFill(
+            payload.title,
+            payload.description,
+            payload.category.topic,
+            payload.category.area,
+            payload.kind.nativeLabel,
+            payload.snapshot ?? "",
+            payload.bundleID ?? "",
+            selectPopups,
+            confirmSubmit,
+            &errorMessage
+        )
+        defer {
+            if let errorMessage {
+                RelatoFeedbackAssistantFree(errorMessage)
+            }
+        }
+        guard status == 0 else {
+            throw RelatoError.invalidArgument(errorMessage.map { String(cString: $0) } ?? "Feedback Assistant automation failed")
+        }
     }
 
     private static func run(_ launchPath: String, arguments: [String]) throws {

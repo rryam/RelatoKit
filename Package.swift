@@ -14,10 +14,12 @@ let package = Package(
     targets: [
         .target(
             name: "RelatoKit",
+            dependencies: ["RelatoNativeAutomation"],
             linkerSettings: [
                 .linkedLibrary("sqlite3")
             ]
         ),
+        .target(name: "RelatoNativeAutomation"),
         .executableTarget(
             name: "relato",
             dependencies: ["RelatoKit"]

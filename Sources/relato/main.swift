@@ -487,7 +487,7 @@ enum RelatoCLI {
             Safety:
               `--confirm` clicks the visible native Submit button. It is not headless
               submission and local store verification is not an Apple server receipt.
-              Native form automation uses macOS Accessibility APIs, not AppleScript.
+              Native form automation uses an Objective-C Accessibility/CoreGraphics engine, not AppleScript.
             """
         )
     }
@@ -560,9 +560,9 @@ enum RelatoCLI {
               Apple can add topic-specific required fields, popups, diagnostics, or log
               gathering. Agents should inspect the visible app before `--confirm`; the
               local store check is useful evidence but not a server-side receipt.
-              RelatoKit uses Accessibility elements directly for native UI automation.
-              Some controls can still require visible app review because Apple owns the
-              final native form.
+              RelatoKit uses an Objective-C Accessibility/CoreGraphics engine for native UI automation.
+              Feedback Assistant may require foreground CoreGraphics fallback when its
+              SwiftUI controls do not commit background AX text writes.
 
             Agent pattern:
               relato submit --payload feedback-submission.json --dry-run --confirm
@@ -589,8 +589,8 @@ enum RelatoCLI {
               needs to retry the visible form fill after changing native-only fields.
 
               --select-popups asks the AX driver to select known area/type popups. Some
-              Apple forms use topic-specific popup labels, so inspect the native UI
-              afterward.
+              Apple forms use topic-specific popup labels and supported values, so
+              inspect the native UI afterward.
             """
         )
     }
