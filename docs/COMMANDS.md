@@ -195,8 +195,8 @@ Native form reality:
   gathering. Agents should inspect the visible app before `--confirm`; the
   local store check is useful evidence but not a server-side receipt.
   RelatoKit uses an Objective-C Accessibility/CoreGraphics engine for native UI automation.
-  Feedback Assistant may require foreground CoreGraphics fallback when its
-  SwiftUI controls do not commit background AX text writes.
+  Text is routed through process-targeted CoreGraphics events before any
+  foreground fallback.
 
 Agent pattern:
   relato submit --payload feedback-submission.json --dry-run --confirm

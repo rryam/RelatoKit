@@ -8,6 +8,10 @@ static NSString *RFAString(const char *value) {
     return [NSString stringWithUTF8String:value] ?: @"";
 }
 
+static BOOL RFADisableForegroundFallback(void) {
+    return [[[NSProcessInfo processInfo] environment][@"RELATO_DISABLE_FOREGROUND_FALLBACK"] isEqualToString:@"1"];
+}
+
 static int RFAFail(char **errorOut, NSString *message) {
     if (errorOut != NULL) {
         *errorOut = strdup(message.UTF8String);
@@ -198,6 +202,76 @@ static BOOL RFAPostCommandKey(CGKeyCode keyCode) {
     return YES;
 }
 
+static BOOL RFAPostCommandKeyToPid(CGKeyCode keyCode, pid_t pid) {
+    CGEventRef down = CGEventCreateKeyboardEvent(NULL, keyCode, true);
+    CGEventRef up = CGEventCreateKeyboardEvent(NULL, keyCode, false);
+    if (down == NULL || up == NULL) {
+        if (down != NULL) { CFRelease(down); }
+        if (up != NULL) { CFRelease(up); }
+        return NO;
+    }
+    CGEventSetFlags(down, kCGEventFlagMaskCommand);
+    CGEventSetFlags(up, kCGEventFlagMaskCommand);
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+    CGEventPostToPid(pid, down);
+    CGEventPostToPid(pid, up);
+#pragma clang diagnostic pop
+    CFRelease(down);
+    CFRelease(up);
+    return YES;
+}
+
+static BOOL RFAPostTextToPid(NSString *text, pid_t pid) {
+    for (NSUInteger index = 0; index < text.length; index++) {
+        UniChar character = [text characterAtIndex:index];
+        CGEventRef down = CGEventCreateKeyboardEvent(NULL, 0, true);
+        CGEventRef up = CGEventCreateKeyboardEvent(NULL, 0, false);
+        if (down == NULL || up == NULL) {
+            if (down != NULL) { CFRelease(down); }
+            if (up != NULL) { CFRelease(up); }
+            return NO;
+        }
+        CGEventKeyboardSetUnicodeString(down, 1, &character);
+        CGEventKeyboardSetUnicodeString(up, 1, &character);
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+        CGEventPostToPid(pid, down);
+        CGEventPostToPid(pid, up);
+#pragma clang diagnostic pop
+        CFRelease(down);
+        CFRelease(up);
+    }
+    return YES;
+}
+
+static BOOL RFAPasteTargeted(NSString *value, AXUIElementRef input, AXUIElementRef appElement, NSRunningApplication *app) {
+    AXUIElementSetAttributeValue(input, kAXFocusedAttribute, kCFBooleanTrue);
+    AXUIElementSetAttributeValue(appElement, kAXFocusedUIElementAttribute, input);
+    AXUIElementPerformAction(input, kAXPressAction);
+    [NSThread sleepForTimeInterval:0.1];
+
+    NSPasteboard *pasteboard = NSPasteboard.generalPasteboard;
+    NSString *previous = [pasteboard stringForType:NSPasteboardTypeString];
+    [pasteboard clearContents];
+    [pasteboard setString:value forType:NSPasteboardTypeString];
+
+    BOOL ok = RFAPostCommandKeyToPid(0, app.processIdentifier) && RFAPostCommandKeyToPid(9, app.processIdentifier);
+    [NSThread sleepForTimeInterval:0.2];
+
+    if (![RFAAttributeString(input, kAXValueAttribute) isEqualToString:value]) {
+        AXUIElementSetAttributeValue(input, kAXValueAttribute, (__bridge CFStringRef)@"");
+        ok = RFAPostTextToPid(value, app.processIdentifier);
+        [NSThread sleepForTimeInterval:0.2];
+    }
+
+    [pasteboard clearContents];
+    if (previous != nil) {
+        [pasteboard setString:previous forType:NSPasteboardTypeString];
+    }
+    return ok && [RFAAttributeString(input, kAXValueAttribute) isEqualToString:value];
+}
+
 static BOOL RFAPasteForeground(NSString *value, AXUIElementRef input, NSRunningApplication *app) {
     [app activateWithOptions:0];
     [NSThread sleepForTimeInterval:0.3];
@@ -220,7 +294,7 @@ static BOOL RFAPasteForeground(NSString *value, AXUIElementRef input, NSRunningA
     return ok;
 }
 
-static int RFASetText(AXUIElementRef root, NSString *label, NSString *value, NSRunningApplication *runningApp, char **errorOut) {
+static int RFASetText(AXUIElementRef root, NSString *label, NSString *value, AXUIElementRef appElement, NSRunningApplication *runningApp, char **errorOut) {
     AXUIElementRef input = RFAFindDescendant(root, ^BOOL(AXUIElementRef element) {
         return RFAIsTextInput(element) && RFAMatches(element, label);
     });
@@ -235,12 +309,14 @@ static int RFASetText(AXUIElementRef root, NSString *label, NSString *value, NSR
         return RFAFail(errorOut, [NSString stringWithFormat:@"Could not set text input %@: %d", label, setError]);
     }
 
-    if (![RFAAttributeString(input, kAXValueAttribute) isEqualToString:value]) {
+    RFAPasteTargeted(value, input, appElement, runningApp);
+    if (![RFAAttributeString(input, kAXValueAttribute) isEqualToString:value] && !RFADisableForegroundFallback()) {
         RFAPasteForeground(value, input, runningApp);
     }
     if (![RFAAttributeString(input, kAXValueAttribute) isEqualToString:value]) {
         return RFAFail(errorOut, [NSString stringWithFormat:@"Text input did not commit value for %@", label]);
     }
+    CFRelease(input);
     return 0;
 }
 
@@ -423,14 +499,14 @@ int RelatoFeedbackAssistantFill(
 
     AXUIElementRef window = RFAFirstWindow(app);
     if (window == NULL) { window = app; CFRetain(window); }
-    int result = RFASetText(window, @"Please provide a descriptive title for your feedback:", RFAString(title), runningApp, errorOut);
+    int result = RFASetText(window, @"Please provide a descriptive title for your feedback:", RFAString(title), app, runningApp, errorOut);
     if (result != 0) { CFRelease(app); return result; }
-    result = RFASetText(window, @"Please describe the issue and what steps we can take to reproduce it", RFAString(description), runningApp, errorOut);
+    result = RFASetText(window, @"Please describe the issue and what steps we can take to reproduce it", RFAString(description), app, runningApp, errorOut);
     if (result != 0) { CFRelease(app); return result; }
 
     NSString *bundleString = RFAString(bundleID);
     if (bundleString.length > 0) {
-        RFASetText(window, @"Please provide the bundleId or appAppleId of your app:", bundleString, runningApp, NULL);
+        RFASetText(window, @"Please provide the bundleId or appAppleId of your app:", bundleString, app, runningApp, NULL);
     }
 
     if (selectPopups) {
