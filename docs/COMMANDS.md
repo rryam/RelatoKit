@@ -62,10 +62,11 @@ Help topics:
   relato help store
 
 Safety:
-  `--confirm` clicks the visible native Submit button. It is not headless
+  `--confirm` presses the native Submit button through Accessibility. It is not headless
   submission and local store verification is not an Apple server receipt.
-  Native form automation uses an Objective-C Accessibility/CoreGraphics engine
-  with action-first AX and process-targeted CoreGraphics/SkyLight keyboard delivery.
+  Native form automation uses an Objective-C Accessibility engine with passive
+  AX value writes for fields; it does not synthesize mouse or keyboard input.
+  Feedback Assistant is opened without activation and hidden after launch/fill.
   Snapshot attachments are staged into the local Feedback Assistant draft
   folder in the background after the native draft exists.
 ```
@@ -178,11 +179,11 @@ Usage:
   relato submit [--payload PATH] [--select-popups] [--wait-seconds N] [--verify-wait-seconds N] [--db PATH] [--confirm] [--verify-store] [--dry-run]
 
 Default behavior:
-  Without `--confirm`, this opens Feedback Assistant, fills the visible native
-  form from the JSON payload, and stops before the Submit click.
+  Without `--confirm`, this opens Feedback Assistant without activation, fills
+  the native form from the JSON payload, hides the app, and stops before Submit.
 
 Confirmation:
-  --confirm             Clicks the visible native Submit button through
+  --confirm             Presses the native Submit button through
                         Accessibility automation. Use only after explicit
                         user confirmation at action time.
 
@@ -195,17 +196,20 @@ Verification:
 
 Native form reality:
   Apple can add topic-specific required fields, popups, diagnostics, or log
-  gathering. Agents should inspect the visible app before `--confirm`; the
+  gathering. Agents should inspect the native app before `--confirm`; the
   local store check is useful evidence but not a server-side receipt.
-  RelatoKit uses an Objective-C Accessibility/CoreGraphics engine for native UI automation.
-  Text is routed through process-targeted CoreGraphics/SkyLight keyboard events.
+  RelatoKit uses an Objective-C Accessibility engine for native UI automation.
+  Text fields are set through passive AX value writes, without moving focus,
+  clicking, or synthesizing keyboard input.
   Snapshot attachments are staged into the local Feedback Assistant draft folder after the native draft
   exists, avoiding the Add Attachment picker. RelatoKit fails closed instead of
   foregrounding Feedback Assistant when a native control refuses background automation.
+  Feedback Assistant's SwiftUI popups can expose no selectable AX children while
+  hidden; in that case `--select-popups` fails closed instead of taking over input.
 
 Agent pattern:
   relato submit --payload feedback-submission.json --dry-run --confirm
-  relato submit --payload feedback-submission.json --select-popups
+  relato submit --payload feedback-submission.json
   # inspect native UI and satisfy Apple-only fields
   relato submit --payload feedback-submission.json --confirm --verify-store
   relato store list --limit 10
@@ -223,7 +227,7 @@ Usage:
 Notes:
   This does not open a new route and does not submit. It is useful when an
   agent has already navigated the native app, manually selected a topic, or
-  needs to retry the visible form fill after changing native-only fields.
+  needs to retry form fill after changing native-only fields.
 
   --select-popups asks the AX driver to select known area/type popups. Some
   Apple forms use topic-specific popup labels and supported values, so

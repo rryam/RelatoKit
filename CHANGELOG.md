@@ -19,7 +19,8 @@ All notable changes to RelatoKit will be documented in this file.
 - Added URL and route tests for prepared feedback payloads.
 - Expanded `relato --help`, topic help, and generated command docs for agent-oriented payload and submit workflows.
 - Replaced the AppleScript native-fill engine with a Swift `AXUIElement` driver and removed the `--background` and `--script` CLI flags.
-- Moved native Feedback Assistant automation to an Objective-C Accessibility/CoreGraphics engine and added fail-closed handling for unsupported local attachment pickers.
-- Added process-targeted CoreGraphics text routing, matching the public `CGEventPostToPid` background keyboard pattern used by macOS automation tools.
+- Moved native Feedback Assistant automation to an Objective-C Accessibility engine and added fail-closed handling for unsupported local attachment pickers.
+- Switched field filling to passive AX value writes so the CLI does not take keyboard focus from the user's current text field.
 - Added background local attachment staging into Feedback Assistant draft folders and removed foreground attachment picker automation.
-- Removed synthetic mouse-event fallbacks from the production native automation path.
+- Opened Feedback Assistant without activation, hid it after launch/fill, and documented the tested Cua/Peekaboo-style background input boundary for SwiftUI popups.
+- Removed synthetic mouse and keyboard event fallbacks from the production native automation path.

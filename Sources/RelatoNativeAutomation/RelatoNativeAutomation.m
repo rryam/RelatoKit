@@ -2,7 +2,6 @@
 
 #import <AppKit/AppKit.h>
 #import <ApplicationServices/ApplicationServices.h>
-#import <dlfcn.h>
 
 static NSString *RFAString(const char *value) {
     if (value == NULL) { return @""; }
@@ -14,38 +13,6 @@ static int RFAFail(char **errorOut, NSString *message) {
         *errorOut = strdup(message.UTF8String);
     }
     return 1;
-}
-
-typedef void (*RFASLEventPostToPidFunction)(pid_t pid, CGEventRef event);
-
-static void RFAStampEventForPid(CGEventRef event, pid_t pid) {
-    if (event == NULL || pid <= 0) { return; }
-    CGEventSetIntegerValueField(event, kCGEventTargetUnixProcessID, pid);
-}
-
-static RFASLEventPostToPidFunction RFASkyLightPostToPid(void) {
-    static RFASLEventPostToPidFunction postToPid = NULL;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        void *handle = dlopen("/System/Library/PrivateFrameworks/SkyLight.framework/SkyLight", RTLD_LAZY);
-        if (handle == NULL) { return; }
-        postToPid = (RFASLEventPostToPidFunction)dlsym(handle, "SLEventPostToPid");
-    });
-    return postToPid;
-}
-
-static BOOL RFAPostEventToPid(CGEventRef event, pid_t pid) {
-    RFAStampEventForPid(event, pid);
-    RFASLEventPostToPidFunction skyLightPostToPid = RFASkyLightPostToPid();
-    if (skyLightPostToPid != NULL) {
-        skyLightPostToPid(pid, event);
-        return YES;
-    }
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-    CGEventPostToPid(pid, event);
-#pragma clang diagnostic pop
-    return YES;
 }
 
 void RelatoFeedbackAssistantFree(char *value) {
@@ -182,33 +149,12 @@ static AXUIElementRef RFAFindWindow(AXUIElementRef app, BOOL (^predicate)(AXUIEl
     return result;
 }
 
-static BOOL RFAPointAndSize(AXUIElementRef element, CGPoint *point, CGSize *size);
 static BOOL RFAPress(AXUIElementRef element);
 
 static AXUIElementRef RFAFindButton(AXUIElementRef root, NSString *name) {
     return RFAFindDescendant(root, ^BOOL(AXUIElementRef element) {
         return [RFARole(element) isEqualToString:NSAccessibilityButtonRole] && RFAMatches(element, name);
     });
-}
-
-static BOOL RFAPointAndSize(AXUIElementRef element, CGPoint *point, CGSize *size) {
-    CFTypeRef positionValue = NULL;
-    CFTypeRef sizeValue = NULL;
-    BOOL ok = NO;
-    if (AXUIElementCopyAttributeValue(element, kAXPositionAttribute, &positionValue) == kAXErrorSuccess &&
-        AXUIElementCopyAttributeValue(element, kAXSizeAttribute, &sizeValue) == kAXErrorSuccess &&
-        positionValue != NULL && sizeValue != NULL &&
-        CFGetTypeID(positionValue) == AXValueGetTypeID() &&
-        CFGetTypeID(sizeValue) == AXValueGetTypeID() &&
-        AXValueGetType(positionValue) == kAXValueCGPointType &&
-        AXValueGetType(sizeValue) == kAXValueCGSizeType) {
-        AXValueGetValue(positionValue, kAXValueCGPointType, point);
-        AXValueGetValue(sizeValue, kAXValueCGSizeType, size);
-        ok = YES;
-    }
-    if (positionValue != NULL) { CFRelease(positionValue); }
-    if (sizeValue != NULL) { CFRelease(sizeValue); }
-    return ok;
 }
 
 static BOOL RFAPress(AXUIElementRef element) {
@@ -219,99 +165,7 @@ static BOOL RFAPerformActionOnly(AXUIElementRef element, CFStringRef action) {
     return element != NULL && AXUIElementPerformAction(element, action) == kAXErrorSuccess;
 }
 
-static BOOL RFAPressActionOnly(AXUIElementRef element) {
-    return RFAPerformActionOnly(element, kAXPressAction);
-}
-
-static BOOL RFAPerformActionOnElementOrChild(AXUIElementRef element, CFStringRef action) {
-    if (RFAPerformActionOnly(element, action)) { return YES; }
-    AXUIElementRef actionElement = RFAFindDescendant(element, ^BOOL(AXUIElementRef child) {
-        NSString *role = RFARole(child);
-        if (![role isEqualToString:NSAccessibilityButtonRole] &&
-            ![role isEqualToString:NSAccessibilityMenuButtonRole] &&
-            ![role isEqualToString:NSAccessibilityPopUpButtonRole]) {
-            return NO;
-        }
-        return RFAPerformActionOnly(child, action);
-    });
-    if (actionElement != NULL) {
-        CFRelease(actionElement);
-        return YES;
-    }
-    return NO;
-}
-
-static void RFAScrollElementToVisible(AXUIElementRef element) {
-    if (element == NULL) { return; }
-    AXUIElementPerformAction(element, CFSTR("AXScrollToVisible"));
-    [NSThread sleepForTimeInterval:0.25];
-}
-
-static BOOL RFAPostCommandKeyToPid(CGKeyCode keyCode, pid_t pid) {
-    CGEventRef down = CGEventCreateKeyboardEvent(NULL, keyCode, true);
-    CGEventRef up = CGEventCreateKeyboardEvent(NULL, keyCode, false);
-    if (down == NULL || up == NULL) {
-        if (down != NULL) { CFRelease(down); }
-        if (up != NULL) { CFRelease(up); }
-        return NO;
-    }
-    CGEventSetFlags(down, kCGEventFlagMaskCommand);
-    CGEventSetFlags(up, kCGEventFlagMaskCommand);
-    RFAPostEventToPid(down, pid);
-    RFAPostEventToPid(up, pid);
-    CFRelease(down);
-    CFRelease(up);
-    return YES;
-}
-
-static BOOL RFAPostTextToPid(NSString *text, pid_t pid) {
-    for (NSUInteger index = 0; index < text.length; index++) {
-        UniChar character = [text characterAtIndex:index];
-        CGEventRef down = CGEventCreateKeyboardEvent(NULL, 0, true);
-        CGEventRef up = CGEventCreateKeyboardEvent(NULL, 0, false);
-        if (down == NULL || up == NULL) {
-            if (down != NULL) { CFRelease(down); }
-            if (up != NULL) { CFRelease(up); }
-            return NO;
-        }
-        CGEventKeyboardSetUnicodeString(down, 1, &character);
-        CGEventKeyboardSetUnicodeString(up, 1, &character);
-        RFAPostEventToPid(down, pid);
-        RFAPostEventToPid(up, pid);
-        CFRelease(down);
-        CFRelease(up);
-    }
-    return YES;
-}
-
-static BOOL RFAPasteTargeted(NSString *value, AXUIElementRef input, AXUIElementRef appElement, NSRunningApplication *app) {
-    AXUIElementSetAttributeValue(input, kAXFocusedAttribute, kCFBooleanTrue);
-    AXUIElementSetAttributeValue(appElement, kAXFocusedUIElementAttribute, input);
-    AXUIElementPerformAction(input, kAXPressAction);
-    [NSThread sleepForTimeInterval:0.1];
-
-    NSPasteboard *pasteboard = NSPasteboard.generalPasteboard;
-    NSString *previous = [pasteboard stringForType:NSPasteboardTypeString];
-    [pasteboard clearContents];
-    [pasteboard setString:value forType:NSPasteboardTypeString];
-
-    BOOL ok = RFAPostCommandKeyToPid(0, app.processIdentifier) && RFAPostCommandKeyToPid(9, app.processIdentifier);
-    [NSThread sleepForTimeInterval:0.2];
-
-    if (![RFAAttributeString(input, kAXValueAttribute) isEqualToString:value]) {
-        AXUIElementSetAttributeValue(input, kAXValueAttribute, (__bridge CFStringRef)@"");
-        ok = RFAPostTextToPid(value, app.processIdentifier);
-        [NSThread sleepForTimeInterval:0.2];
-    }
-
-    [pasteboard clearContents];
-    if (previous != nil) {
-        [pasteboard setString:previous forType:NSPasteboardTypeString];
-    }
-    return ok && [RFAAttributeString(input, kAXValueAttribute) isEqualToString:value];
-}
-
-static int RFASetText(AXUIElementRef root, NSString *label, NSString *value, AXUIElementRef appElement, NSRunningApplication *runningApp, char **errorOut) {
+static int RFASetText(AXUIElementRef root, NSString *label, NSString *value, char **errorOut) {
     AXUIElementRef input = RFAFindDescendant(root, ^BOOL(AXUIElementRef element) {
         return RFAIsTextInput(element) && RFAMatches(element, label);
     });
@@ -319,22 +173,20 @@ static int RFASetText(AXUIElementRef root, NSString *label, NSString *value, AXU
         return RFAFail(errorOut, [NSString stringWithFormat:@"Could not find text input: %@", label]);
     }
 
-    AXUIElementSetAttributeValue(input, kAXFocusedAttribute, kCFBooleanTrue);
-    [NSThread sleepForTimeInterval:0.1];
     AXError setError = AXUIElementSetAttributeValue(input, kAXValueAttribute, (__bridge CFStringRef)value);
     if (setError != kAXErrorSuccess) {
-        return RFAFail(errorOut, [NSString stringWithFormat:@"Could not set text input %@: %d", label, setError]);
+        CFRelease(input);
+        return RFAFail(errorOut, [NSString stringWithFormat:@"Could not passively set text input %@: %d", label, setError]);
     }
-
-    RFAPasteTargeted(value, input, appElement, runningApp);
     if (![RFAAttributeString(input, kAXValueAttribute) isEqualToString:value]) {
-        return RFAFail(errorOut, [NSString stringWithFormat:@"Text input did not commit value for %@", label]);
+        CFRelease(input);
+        return RFAFail(errorOut, [NSString stringWithFormat:@"Text input did not passively commit value for %@", label]);
     }
     CFRelease(input);
     return 0;
 }
 
-static int RFASelectPopup(AXUIElementRef root, NSArray<NSString *> *labels, NSString *value, NSRunningApplication *runningApp, char **errorOut) {
+static int RFASelectPopup(AXUIElementRef root, NSArray<NSString *> *labels, NSString *value, char **errorOut) {
     AXUIElementRef popup = RFAFindDescendant(root, ^BOOL(AXUIElementRef element) {
         if (![RFARole(element) isEqualToString:NSAccessibilityPopUpButtonRole]) { return NO; }
         for (NSString *label in labels) {
@@ -346,43 +198,14 @@ static int RFASelectPopup(AXUIElementRef root, NSArray<NSString *> *labels, NSSt
         return RFAFail(errorOut, [NSString stringWithFormat:@"Could not find popup: %@", [labels componentsJoinedByString:@" / "]]);
     }
 
-    for (NSInteger attempt = 0; attempt < 3; attempt++) {
-        AXUIElementSetAttributeValue(popup, kAXValueAttribute, (__bridge CFStringRef)value);
-        [NSThread sleepForTimeInterval:0.25];
-        if ([RFAAttributeString(popup, kAXValueAttribute) rangeOfString:value options:NSCaseInsensitiveSearch].location != NSNotFound) {
-            CFRelease(popup);
-            return 0;
-        }
-
-        RFAScrollElementToVisible(popup);
-        RFAPerformActionOnElementOrChild(popup, CFSTR("AXShowMenu"));
-        RFAPerformActionOnElementOrChild(popup, kAXPressAction);
-        [NSThread sleepForTimeInterval:0.5];
-        AXUIElementRef systemWide = AXUIElementCreateSystemWide();
-        AXUIElementRef searchRoots[] = { root, systemWide };
-        for (NSUInteger rootIndex = 0; rootIndex < 2; rootIndex++) {
-            AXUIElementRef searchRoot = searchRoots[rootIndex];
-            AXUIElementRef item = RFAFindDescendant(searchRoot, ^BOOL(AXUIElementRef element) {
-                NSString *role = RFARole(element);
-                return ([role isEqualToString:NSAccessibilityMenuItemRole] || [role isEqualToString:NSAccessibilityStaticTextRole]) && RFAMatches(element, value);
-            });
-            BOOL pressed = item != NULL &&
-                RFAPressActionOnly(item);
-            if (pressed) {
-                [NSThread sleepForTimeInterval:0.25];
-                if ([RFAAttributeString(popup, kAXValueAttribute) rangeOfString:value options:NSCaseInsensitiveSearch].location != NSNotFound) {
-                    CFRelease(item);
-                    CFRelease(systemWide);
-                    CFRelease(popup);
-                    return 0;
-                }
-            }
-            if (item != NULL) { CFRelease(item); }
-        }
-        CFRelease(systemWide);
+    AXUIElementSetAttributeValue(popup, kAXValueAttribute, (__bridge CFStringRef)value);
+    [NSThread sleepForTimeInterval:0.25];
+    if ([RFAAttributeString(popup, kAXValueAttribute) rangeOfString:value options:NSCaseInsensitiveSearch].location != NSNotFound) {
+        CFRelease(popup);
+        return 0;
     }
 
-    return RFAFail(errorOut, [NSString stringWithFormat:@"Could not select popup value '%@' for %@ in background", value, [labels componentsJoinedByString:@" / "]]);
+    return RFAFail(errorOut, [NSString stringWithFormat:@"Could not passively set popup value '%@' for %@ without taking keyboard focus", value, [labels componentsJoinedByString:@" / "]]);
 }
 
 int RelatoFeedbackAssistantFill(
@@ -450,20 +273,20 @@ int RelatoFeedbackAssistantFill(
     CFRelease(titleInput);
     if (window == NULL) { window = RFAFirstWindow(app); }
     if (window == NULL) { window = app; CFRetain(window); }
-    int result = RFASetText(window, @"Please provide a descriptive title for your feedback:", RFAString(title), app, runningApp, errorOut);
+    int result = RFASetText(window, @"Please provide a descriptive title for your feedback:", RFAString(title), errorOut);
     if (result != 0) { CFRelease(app); return result; }
-    result = RFASetText(window, @"Please describe the issue and what steps we can take to reproduce it", RFAString(description), app, runningApp, errorOut);
+    result = RFASetText(window, @"Please describe the issue and what steps we can take to reproduce it", RFAString(description), errorOut);
     if (result != 0) { CFRelease(app); return result; }
 
     NSString *bundleString = RFAString(bundleID);
     if (bundleString.length > 0) {
-        RFASetText(window, @"Please provide the bundleId or appAppleId of your app:", bundleString, app, runningApp, NULL);
+        RFASetText(window, @"Please provide the bundleId or appAppleId of your app:", bundleString, NULL);
     }
 
     if (selectPopups) {
-        result = RFASelectPopup(window, @[@"Which area are you seeing an issue with?"], RFAString(area), runningApp, errorOut);
+        result = RFASelectPopup(window, @[@"Which area are you seeing an issue with?"], RFAString(area), errorOut);
         if (result != 0) { CFRelease(app); return result; }
-        result = RFASelectPopup(window, @[@"What type of feedback are you reporting?", @"What type of issue are you reporting?"], RFAString(kind), runningApp, errorOut);
+        result = RFASelectPopup(window, @[@"What type of feedback are you reporting?", @"What type of issue are you reporting?"], RFAString(kind), errorOut);
         if (result != 0) { CFRelease(app); return result; }
     }
 

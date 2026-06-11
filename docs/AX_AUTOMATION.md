@@ -1,6 +1,6 @@
 # AX Automation
 
-RelatoKit uses macOS Accessibility APIs for native Feedback Assistant automation. The native form driver is implemented in Objective-C with `AXUIElement`, CoreGraphics events, and local fallbacks for native controls Feedback Assistant does not expose cleanly.
+RelatoKit uses macOS Accessibility APIs for native Feedback Assistant automation. The native form driver is implemented in Objective-C with `AXUIElement` and fail-closed handling for native controls Feedback Assistant does not expose cleanly.
 
 The AX driver works by:
 
@@ -8,12 +8,13 @@ The AX driver works by:
 2. Reading windows and descendants from the Accessibility tree.
 3. Matching controls by role, title, description, and value.
 4. Attempting text fields and text areas through `AXValue`.
-5. Trying named actions such as `AXPress` and `AXShowMenu` before synthetic input.
-6. Routing text through public process-targeted CoreGraphics keyboard events with `CGEventPostToPid`.
-7. Using SkyLight per-PID keyboard event posting when public targeting is not enough.
+5. Using passive `AXValue` writes for text fields and exposed popups.
+6. Avoiding synthetic mouse events, keyboard events, pasteboard writes, and focus reassignment.
+7. Failing closed when a native control requires active focus or pointer ownership.
 8. Staging local snapshots into the active Feedback Assistant draft folder after the native draft exists.
-9. Failing closed instead of foregrounding Feedback Assistant when a native control refuses background automation.
-10. Stopping before final submission unless `--confirm` is explicitly provided.
+9. Opening Feedback Assistant without activation and hiding it after launch/fill.
+10. Failing closed instead of foregrounding Feedback Assistant when a native control refuses background automation.
+11. Stopping before final submission unless `--confirm` is explicitly provided.
 
 ## What AX Can Do
 
@@ -23,14 +24,16 @@ AX can drive many native controls without AppleScript:
 - set bundle identifier fields when the form exposes them
 - choose topic rows
 - press Continue and Submit buttons
-- select exposed pop-up menu items
+- passively set exposed pop-up values when Feedback Assistant accepts direct AX values
 - stage local evidence files into Feedback Assistant's local draft folder
 
 ## Practical Limits
 
-AX is still native UI automation. It depends on the target app exposing useful Accessibility elements. Feedback Assistant can expose settable text values that echo through AX without committing into the visible SwiftUI form while inactive, so RelatoKit does not trust AX readback alone. It follows the public background keyboard pattern used by macOS automation projects: focus the target AX element, then send scoped CoreGraphics keyboard events directly to Feedback Assistant's process ID.
+AX is still native UI automation. It depends on the target app exposing useful Accessibility elements. RelatoKit intentionally does not focus target fields, synthesize keyboard input, move the pointer, or use the pasteboard during the default fill path. That keeps the user's current text insertion focus intact, but it means some Feedback Assistant controls can only be completed by the user in the native app.
 
-If the process-targeted path fails, RelatoKit fails closed. The production CLI should preserve the user's current app and report the unsupported native-control boundary.
+If passive AX mutation fails, RelatoKit fails closed. The production CLI should preserve the user's current app and report the unsupported native-control boundary.
+
+We tested the stronger macOS background-input pattern used by tools such as Cua and Peekaboo: SkyLight per-PID event posting, focus-without-raise, AX direct value setting, and process-targeted keyboard events. That route can mutate and render hidden Feedback Assistant text fields, but Feedback Assistant's SwiftUI popups expose no selectable children while hidden and did not accept hidden process-targeted keyboard selection. RelatoKit therefore keeps popups fail-closed instead of stealing focus.
 
 Some forms do not support every report kind. For example, a macOS form can accept `Incorrect/Unexpected Behavior` while rejecting `Suggestion` for its type popup. In those cases RelatoKit reports the failing native value instead of pretending the form was completed.
 

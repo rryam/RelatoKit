@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import RelatoNativeAutomation
 
@@ -8,6 +9,7 @@ public enum FeedbackAssistantApp {
 
     public static func open(_ url: URL) throws {
         try run("/usr/bin/open", arguments: ["-g", "-j", "-b", FeedbackRoutes.appBundleIdentifier, url.absoluteString])
+        hideIfRunning()
     }
 
     @discardableResult
@@ -27,6 +29,7 @@ public enum FeedbackAssistantApp {
                 storePath: storePath
             )
             try runNativeFill(payload: payload, snapshot: "", selectPopups: selectPopups, confirmSubmit: true)
+            hideIfRunning()
             return FillResult(stagedAttachment: attachment)
         }
 
@@ -37,7 +40,14 @@ public enum FeedbackAssistantApp {
             draftID: attachmentDraftID,
             storePath: storePath
         ) : nil
+        hideIfRunning()
         return FillResult(stagedAttachment: attachment)
+    }
+
+    private static func hideIfRunning() {
+        NSRunningApplication
+            .runningApplications(withBundleIdentifier: FeedbackRoutes.appBundleIdentifier)
+            .forEach { _ = $0.hide() }
     }
 
     private static func runNativeFill(
