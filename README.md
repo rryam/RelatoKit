@@ -66,8 +66,9 @@ RelatoKit gives you a small command-line workflow around the native Feedback Ass
 - topic and area inference from title, description, and bundle identifier
 - JSON and Markdown report preparation
 - native Feedback Assistant route launching
-- AX-driven title, description, bundle ID, pop-up, attachment, and submit handoff
-- private-framework research notes kept outside the normal CLI surface
+- AX-driven title, description, bundle ID, pop-up, and submit handoff
+- background local attachment staging into Feedback Assistant draft folders
+- private UI-event fallback for stubborn native controls when public AX/CoreGraphics is not enough
 
 ## First Commands
 
@@ -155,22 +156,22 @@ relato help fill
 relato help store
 ```
 
-Native form automation uses an Objective-C Accessibility/CoreGraphics engine. There is no AppleScript engine and no separate background mode. RelatoKit uses AX to locate and focus controls, then routes text through public process-targeted CoreGraphics events (`CGEventPostToPid`) before falling back to foreground paste only if Feedback Assistant refuses the background path. It stops for review unless `--confirm` is explicitly provided.
+Native form automation uses an Objective-C Accessibility/CoreGraphics engine with background-first input. RelatoKit uses AX to locate controls, tries named AX actions such as `AXPress` and `AXShowMenu`, routes text through process-targeted CoreGraphics events, and uses SkyLight per-PID event posting when public targeting is not enough. Local snapshots are staged into Feedback Assistant's local draft folder after the native draft exists, which avoids opening the Add Attachment menu on the user's desktop. RelatoKit does not foreground Feedback Assistant by default; if the native app refuses a background action, it fails closed unless `RELATO_ALLOW_FOREGROUND_FALLBACK=1` is set for a deliberate lab run. It stops for review unless `--confirm` is explicitly provided.
 
 For the automation model, see [docs/AX_AUTOMATION.md](docs/AX_AUTOMATION.md).
 
 ## Current Status
 
-RelatoKit is a pre-1.0 package focused on local store inspection, report preparation, native app launch, AX-driven native form entry, explicit native UI submission, and best-effort local verification. `relato submit --confirm` is native app automation; it is not private headless submission. Same-desktop background text filling now uses process-targeted CoreGraphics events where Feedback Assistant accepts them. Local file attachment is form-dependent and currently fails closed when Feedback Assistant opens a diagnostics sheet instead of a file picker.
+RelatoKit is a pre-1.0 package focused on local store inspection, report preparation, native app launch, native form entry, explicit native UI submission, local file attachment staging, and best-effort local verification. `relato submit --confirm` is native app automation; it is not private headless submission. Same-desktop background filling uses action-first AX plus process-targeted CoreGraphics/SkyLight events where Feedback Assistant accepts them. Local file attachments are copied into the current Feedback Assistant draft folder after the native draft is created; the visible Add Attachment picker path remains an opt-in lab fallback through `RELATO_ALLOW_FOREGROUND_FALLBACK=1`.
 
-The package also includes `Research/feedbackd_probe.m`, an exploratory probe for Feedback Assistant private framework discovery. It is not part of the Swift package build. The first live XPC spike against `feedbackd` hit an entitlement refusal at listener level, and that boundary is respected by the public CLI.
+The package also includes `Research/feedbackd_probe.m`, an exploratory probe for Feedback Assistant private framework discovery. The first live XPC spike against `feedbackd` hit an entitlement refusal at listener level, and that boundary is respected by the CLI.
 
 ## Non-Goals
 
 - No entitlement bypass.
 - No forged Apple credentials.
 - No SIP or platform security workarounds.
-- No headless submission to Apple.
+- No private headless submission to Apple.
 - No redistribution of Apple private headers or copied framework code.
 
 ## Build

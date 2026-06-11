@@ -181,12 +181,13 @@ enum RelatoCLI {
         let selectPopups = takeFlag("--select-popups", from: &arguments)
         try ensureNoArguments(arguments)
         let payload = try loadPayload(at: payloadPath)
-        try FeedbackAssistantApp.fill(payload: payload, selectPopups: selectPopups)
+        let fillResult = try FeedbackAssistantApp.fill(payload: payload, selectPopups: selectPopups)
         if selectPopups {
             print("Set fields and selected requested popups through Accessibility. Review any native-only required fields or diagnostics before submitting.")
         } else {
             print("Set fields through Accessibility. Select native popups if needed: area='\(payload.category.area)', kind='\(payload.kind.rawValue)'")
         }
+        printStagedAttachment(fillResult.stagedAttachment)
     }
 
     static func runSubmit(_ rawArguments: [String]) throws {
@@ -222,10 +223,11 @@ enum RelatoCLI {
         try FeedbackAssistantApp.open(url)
         Thread.sleep(forTimeInterval: waitSeconds)
 
-        try FeedbackAssistantApp.fill(
+        let fillResult = try FeedbackAssistantApp.fill(
             payload: payload,
             selectPopups: selectPopups,
-            confirmSubmit: confirmSubmit
+            confirmSubmit: confirmSubmit,
+            storePath: dbPath
         )
 
         if confirmSubmit {
@@ -233,12 +235,18 @@ enum RelatoCLI {
         } else {
             print("Opened and filled Feedback Assistant through Accessibility. Review any native-only required fields or diagnostics, then re-run with --confirm to press the native Submit button.")
         }
+        printStagedAttachment(fillResult.stagedAttachment)
 
         if verifyStore {
             Thread.sleep(forTimeInterval: verifyWaitSeconds)
             let afterSnapshot = try? store.verificationSnapshot(title: payload.title)
             printStoreVerification(before: beforeSnapshot, after: afterSnapshot, title: payload.title)
         }
+    }
+
+    static func printStagedAttachment(_ attachment: DraftAttachment?) {
+        guard let attachment else { return }
+        print("Staged snapshot in Feedback Assistant draft \(attachment.draftID): \(attachment.path)")
     }
 
     static func loadPayload(at path: String) throws -> PreparedFeedback {
@@ -487,7 +495,10 @@ enum RelatoCLI {
             Safety:
               `--confirm` clicks the visible native Submit button. It is not headless
               submission and local store verification is not an Apple server receipt.
-              Native form automation uses an Objective-C Accessibility/CoreGraphics engine, not AppleScript.
+              Native form automation uses an Objective-C Accessibility/CoreGraphics engine
+              with action-first AX and process-targeted CoreGraphics/SkyLight delivery.
+              Snapshot attachments are staged into the local Feedback Assistant draft
+              folder in the background after the native draft exists.
             """
         )
     }
@@ -561,8 +572,10 @@ enum RelatoCLI {
               gathering. Agents should inspect the visible app before `--confirm`; the
               local store check is useful evidence but not a server-side receipt.
               RelatoKit uses an Objective-C Accessibility/CoreGraphics engine for native UI automation.
-              Text is routed through process-targeted CoreGraphics events before any
-              foreground fallback.
+              Text is routed through process-targeted CoreGraphics events. Snapshot attachments
+              are staged into the local Feedback Assistant draft folder after the native draft
+              exists, avoiding the foreground-only Add Attachment picker. Foreground fallback is
+              opt-in with RELATO_ALLOW_FOREGROUND_FALLBACK=1 for local experiments.
 
             Agent pattern:
               relato submit --payload feedback-submission.json --dry-run --confirm

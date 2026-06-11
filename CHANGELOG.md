@@ -22,3 +22,5 @@ All notable changes to RelatoKit will be documented in this file.
 - Replaced the AppleScript native-fill engine with a Swift `AXUIElement` driver and removed the `--background` and `--script` CLI flags.
 - Moved native Feedback Assistant automation to an Objective-C Accessibility/CoreGraphics engine and added fail-closed handling for unsupported local attachment pickers.
 - Added process-targeted CoreGraphics text routing before foreground fallback, matching the public `CGEventPostToPid` background keyboard pattern used by macOS automation tools.
+- Added background local attachment staging into Feedback Assistant draft folders, with the visible Add Attachment > Choose File path kept as an opt-in lab fallback.
+- Added PID/window-routed CoreGraphics mouse events inspired by Peekaboo-style background input delivery.

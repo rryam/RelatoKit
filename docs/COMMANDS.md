@@ -9,7 +9,7 @@ This file is generated from live CLI help output. RelatoKit is optimized for age
 3. Inspect both files before touching the native app.
 4. Run `relato submit --dry-run --payload feedback-submission.json`.
 5. Run `relato submit --payload feedback-submission.json` to open and fill only.
-6. Inspect Feedback Assistant for native-only fields, diagnostics, and attachments.
+6. Inspect Feedback Assistant for native-only fields, diagnostics, and staged attachments.
 7. Use `--confirm` only after explicit user confirmation.
 8. Use `relato store list` and `relato store uploads` as local evidence afterward.
 
@@ -64,7 +64,10 @@ Help topics:
 Safety:
   `--confirm` clicks the visible native Submit button. It is not headless
   submission and local store verification is not an Apple server receipt.
-  Native form automation uses an Objective-C Accessibility/CoreGraphics engine, not AppleScript.
+  Native form automation uses an Objective-C Accessibility/CoreGraphics engine
+  with action-first AX and process-targeted CoreGraphics/SkyLight delivery.
+  Snapshot attachments are staged into the local Feedback Assistant draft
+  folder in the background after the native draft exists.
 ```
 
 To regenerate:
@@ -195,8 +198,10 @@ Native form reality:
   gathering. Agents should inspect the visible app before `--confirm`; the
   local store check is useful evidence but not a server-side receipt.
   RelatoKit uses an Objective-C Accessibility/CoreGraphics engine for native UI automation.
-  Text is routed through process-targeted CoreGraphics events before any
-  foreground fallback.
+  Text is routed through process-targeted CoreGraphics events. Snapshot attachments
+  are staged into the local Feedback Assistant draft folder after the native draft
+  exists, avoiding the foreground-only Add Attachment picker. Foreground fallback is
+  opt-in with RELATO_ALLOW_FOREGROUND_FALLBACK=1 for local experiments.
 
 Agent pattern:
   relato submit --payload feedback-submission.json --dry-run --confirm
@@ -249,7 +254,7 @@ Notes:
 
 - Use `relato submit --dry-run` before `--confirm` to preview the native handoff plan.
 - Treat the JSON payload as the source of truth; regenerate it instead of hand-editing unless you know the schema.
-- Use the Markdown payload to review the report body and attach supporting evidence.
+- Use the Markdown payload to review the report body and stage supporting evidence.
 - Use `relato open ROUTE --print-only` when you only need the Feedback Assistant URL.
 - Use `relato store summary` and `relato store list` for local verification after native submission.
 - Treat local store verification as local evidence, not an Apple server receipt.
