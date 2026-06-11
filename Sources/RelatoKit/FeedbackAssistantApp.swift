@@ -1,39 +1,16 @@
 import Foundation
 
 public enum FeedbackAssistantApp {
-    public static func open(_ url: URL, background: Bool = false) throws {
-        let arguments = background
-            ? ["-g", "-b", FeedbackRoutes.appBundleIdentifier, url.absoluteString]
-            : ["-b", FeedbackRoutes.appBundleIdentifier, url.absoluteString]
-        try run("/usr/bin/open", arguments: arguments)
+    public static func open(_ url: URL) throws {
+        try run("/usr/bin/open", arguments: ["-b", FeedbackRoutes.appBundleIdentifier, url.absoluteString])
     }
 
     public static func fill(
         payload: PreparedFeedback,
-        scriptURL: URL,
         selectPopups: Bool = false,
-        confirmSubmit: Bool = false,
-        activate: Bool = true
+        confirmSubmit: Bool = false
     ) throws {
-        guard FileManager.default.fileExists(atPath: scriptURL.path) else {
-            throw RelatoError.missingFile(scriptURL.path)
-        }
-        try run(
-            "/usr/bin/osascript",
-            arguments: [
-                scriptURL.path,
-                payload.title,
-                payload.description,
-                payload.category.topic,
-                payload.category.area,
-                payload.kind.nativeLabel,
-                payload.snapshot ?? "",
-                payload.bundleID ?? "",
-                selectPopups ? "true" : "false",
-                confirmSubmit ? "true" : "false",
-                activate ? "true" : "false"
-            ]
-        )
+        try FeedbackAssistantAXDriver().fill(payload: payload, selectPopups: selectPopups, confirmSubmit: confirmSubmit)
     }
 
     private static func run(_ launchPath: String, arguments: [String]) throws {

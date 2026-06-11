@@ -19,3 +19,4 @@ All notable changes to RelatoKit will be documented in this file.
 - Added URL and route tests for prepared feedback payloads.
 - Expanded `relato --help`, topic help, and generated command docs for agent-oriented payload and submit workflows.
 - Added experimental `--background` support for low-interruption native open and text-field filling, with guardrails around foreground-only UI actions.
+- Replaced the AppleScript native-fill engine with a Swift `AXUIElement` driver and removed the `--background` and `--script` CLI flags.

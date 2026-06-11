@@ -157,43 +157,35 @@ enum RelatoCLI {
         let route = arguments.removeFirst()
         let id = try takeOption("--id", from: &arguments)
         let printOnly = takeFlag("--print-only", from: &arguments)
-        let background = takeFlag("--background", from: &arguments)
         try ensureNoArguments(arguments)
         let url = try FeedbackRoutes.url(for: route, id: id)
         if printOnly {
             print(url.absoluteString)
         } else {
-            try FeedbackAssistantApp.open(url, background: background)
+            try FeedbackAssistantApp.open(url)
         }
     }
 
     static func runOpenNative(_ rawArguments: [String]) throws {
         var arguments = rawArguments
         let payloadPath = expandedPath(try takeOption("--payload", from: &arguments) ?? "feedback-submission.json")
-        let background = takeFlag("--background", from: &arguments)
         try ensureNoArguments(arguments)
         let payload = try loadPayload(at: payloadPath)
         let url = try feedbackURL(from: payload)
-        try FeedbackAssistantApp.open(url, background: background)
+        try FeedbackAssistantApp.open(url)
     }
 
     static func runFill(_ rawArguments: [String]) throws {
         var arguments = rawArguments
         let payloadPath = expandedPath(try takeOption("--payload", from: &arguments) ?? "feedback-submission.json")
         let selectPopups = takeFlag("--select-popups", from: &arguments)
-        let background = takeFlag("--background", from: &arguments)
-        let scriptPath = try takeOption("--script", from: &arguments).map(expandedPath)
         try ensureNoArguments(arguments)
         let payload = try loadPayload(at: payloadPath)
-        try validateBackgroundMode(background: background, payload: payload, selectPopups: selectPopups, confirmSubmit: false)
-        let scriptURL = try scriptPath.map(URL.init(fileURLWithPath:)) ?? bundledFillScript()
-        try FeedbackAssistantApp.fill(payload: payload, scriptURL: scriptURL, selectPopups: selectPopups, activate: !background)
+        try FeedbackAssistantApp.fill(payload: payload, selectPopups: selectPopups)
         if selectPopups {
-            print("Set fields and selected requested popups. Review any native-only required fields or diagnostics before submitting.")
-        } else if background {
-            print("Set text fields without activating Feedback Assistant. Inspect the native app before submitting.")
+            print("Set fields and selected requested popups through Accessibility. Review any native-only required fields or diagnostics before submitting.")
         } else {
-            print("Set text fields. Select native popups if needed: area='\(payload.category.area)', kind='\(payload.kind.rawValue)'")
+            print("Set fields through Accessibility. Select native popups if needed: area='\(payload.category.area)', kind='\(payload.kind.rawValue)'")
         }
     }
 
@@ -202,8 +194,6 @@ enum RelatoCLI {
         let payloadPath = expandedPath(try takeOption("--payload", from: &arguments) ?? "feedback-submission.json")
         let selectPopups = takeFlag("--select-popups", from: &arguments)
         let confirmSubmit = takeFlag("--confirm", from: &arguments)
-        let background = takeFlag("--background", from: &arguments)
-        let scriptPath = try takeOption("--script", from: &arguments).map(expandedPath)
         let waitSeconds = try parseSeconds(try takeOption("--wait-seconds", from: &arguments) ?? "1.5", flag: "--wait-seconds")
         let verifyStore = takeFlag("--verify-store", from: &arguments) || confirmSubmit
         let verifyWaitSeconds = try parseSeconds(try takeOption("--verify-wait-seconds", from: &arguments) ?? "3.0", flag: "--verify-wait-seconds")
@@ -212,7 +202,6 @@ enum RelatoCLI {
         try ensureNoArguments(arguments)
         let payload = try loadPayload(at: payloadPath)
         let url = try feedbackURL(from: payload)
-        try validateBackgroundMode(background: background, payload: payload, selectPopups: selectPopups, confirmSubmit: confirmSubmit)
 
         if dryRun {
             printSubmitPlan(
@@ -221,7 +210,6 @@ enum RelatoCLI {
                 url: url,
                 selectPopups: selectPopups,
                 confirmSubmit: confirmSubmit,
-                background: background,
                 verifyStore: verifyStore,
                 dbPath: dbPath
             )
@@ -231,26 +219,19 @@ enum RelatoCLI {
         let store = FeedbackStore(path: dbPath)
         let beforeSnapshot = verifyStore ? try? store.verificationSnapshot(title: payload.title) : nil
 
-        try FeedbackAssistantApp.open(url, background: background)
+        try FeedbackAssistantApp.open(url)
         Thread.sleep(forTimeInterval: waitSeconds)
 
-        let scriptURL = try scriptPath.map(URL.init(fileURLWithPath:)) ?? bundledFillScript()
         try FeedbackAssistantApp.fill(
             payload: payload,
-            scriptURL: scriptURL,
             selectPopups: selectPopups,
-            confirmSubmit: confirmSubmit,
-            activate: !background
+            confirmSubmit: confirmSubmit
         )
 
         if confirmSubmit {
             print("Submit click requested through the native Feedback Assistant UI.")
         } else {
-            if background {
-                print("Opened and filled text fields without activating Feedback Assistant. Inspect the native app before submitting.")
-            } else {
-                print("Opened and filled Feedback Assistant. Review any native-only required fields or diagnostics, then re-run with --confirm to click the native Submit button.")
-            }
+            print("Opened and filled Feedback Assistant through Accessibility. Review any native-only required fields or diagnostics, then re-run with --confirm to press the native Submit button.")
         }
 
         if verifyStore {
@@ -282,31 +263,6 @@ enum RelatoCLI {
             throw RelatoError.invalidArgument("Payload URL must be an https://feedbackassistant.apple.com URL")
         }
         return url
-    }
-
-    static func validateBackgroundMode(
-        background: Bool,
-        payload: PreparedFeedback,
-        selectPopups: Bool,
-        confirmSubmit: Bool
-    ) throws {
-        guard background else { return }
-        if selectPopups {
-            throw RelatoError.invalidArgument("--background cannot be combined with --select-popups because native pop-up menus require foreground focus")
-        }
-        if confirmSubmit {
-            throw RelatoError.invalidArgument("--background cannot be combined with --confirm because the native Submit click requires foreground review")
-        }
-        if let snapshot = payload.snapshot, !snapshot.isEmpty {
-            throw RelatoError.invalidArgument("--background cannot attach files because the native file picker requires foreground focus")
-        }
-    }
-
-    static func bundledFillScript() throws -> URL {
-        if let url = Bundle.module.url(forResource: "feedback_native_fill", withExtension: "applescript") {
-            return url
-        }
-        throw RelatoError.missingFile("feedback_native_fill.applescript")
     }
 
     static func takeOption(_ name: String, from arguments: inout [String]) throws -> String? {
@@ -440,7 +396,6 @@ enum RelatoCLI {
         url: URL,
         selectPopups: Bool,
         confirmSubmit: Bool,
-        background: Bool,
         verifyStore: Bool,
         dbPath: String
     ) {
@@ -453,7 +408,6 @@ enum RelatoCLI {
         print("  bundle ID:     \(payload.bundleID ?? "")")
         print("  snapshot:      \(payload.snapshot ?? "")")
         print("  native URL:    \(url.absoluteString)")
-        print("  background:    \(background ? "yes" : "no")")
         print("  select popups: \(selectPopups ? "yes" : "no")")
         print("  click Submit:  \(confirmSubmit ? "yes (--confirm)" : "no")")
         print("  verify store:  \(verifyStore ? "yes" : "no")")
@@ -518,10 +472,10 @@ enum RelatoCLI {
               relato categorize --title TEXT [--description TEXT] [--bundle-id ID]
               relato prepare --title TEXT --description TEXT [--snapshot PATH] [--bundle-id ID] [--kind bug|suggestion] [--output-dir DIR]
               relato routes
-              relato open ROUTE [--id ID] [--print-only] [--background]
-              relato open-native [--payload PATH] [--background]
-              relato fill [--payload PATH] [--select-popups] [--script PATH] [--background]
-              relato submit [--payload PATH] [--select-popups] [--script PATH] [--wait-seconds N] [--verify-wait-seconds N] [--db PATH] [--confirm] [--verify-store] [--dry-run] [--background]
+              relato open ROUTE [--id ID] [--print-only]
+              relato open-native [--payload PATH]
+              relato fill [--payload PATH] [--select-popups]
+              relato submit [--payload PATH] [--select-popups] [--wait-seconds N] [--verify-wait-seconds N] [--db PATH] [--confirm] [--verify-store] [--dry-run]
 
             Help topics:
               relato help payload
@@ -533,8 +487,7 @@ enum RelatoCLI {
             Safety:
               `--confirm` clicks the visible native Submit button. It is not headless
               submission and local store verification is not an Apple server receipt.
-              `--background` is a low-interruption text-fill mode, not full background
-              submission. Native popups, file attachments, and Submit require foreground UI.
+              Native form automation uses macOS Accessibility APIs, not AppleScript.
             """
         )
     }
@@ -585,7 +538,7 @@ enum RelatoCLI {
             relato submit: open/fill Feedback Assistant and optionally click native Submit
 
             Usage:
-              relato submit [--payload PATH] [--select-popups] [--script PATH] [--wait-seconds N] [--verify-wait-seconds N] [--db PATH] [--confirm] [--verify-store] [--dry-run] [--background]
+              relato submit [--payload PATH] [--select-popups] [--wait-seconds N] [--verify-wait-seconds N] [--db PATH] [--confirm] [--verify-store] [--dry-run]
 
             Default behavior:
               Without `--confirm`, this opens Feedback Assistant, fills the visible native
@@ -602,20 +555,17 @@ enum RelatoCLI {
               --db PATH             Override the local Feedback Assistant SQLite path.
               --dry-run             Print the planned native handoff without opening,
                                     filling, attaching, or submitting.
-              --background          Open in the background and set text fields without
-                                    activation. Not compatible with --select-popups,
-                                    --confirm, or payloads with attachments.
 
             Native form reality:
               Apple can add topic-specific required fields, popups, diagnostics, or log
               gathering. Agents should inspect the visible app before `--confirm`; the
               local store check is useful evidence but not a server-side receipt.
-              macOS does not provide true same-desktop background GUI submission for
-              Feedback Assistant. Use a separate GUI session or VM for fully isolated UI.
+              RelatoKit uses Accessibility elements directly for native UI automation.
+              Some controls can still require visible app review because Apple owns the
+              final native form.
 
             Agent pattern:
               relato submit --payload feedback-submission.json --dry-run --confirm
-              relato submit --payload text-only-feedback.json --background
               relato submit --payload feedback-submission.json --select-popups
               # inspect native UI and satisfy Apple-only fields
               relato submit --payload feedback-submission.json --confirm --verify-store
@@ -631,20 +581,16 @@ enum RelatoCLI {
             relato fill: fill the currently open Feedback Assistant draft
 
             Usage:
-              relato fill [--payload PATH] [--select-popups] [--script PATH] [--background]
+              relato fill [--payload PATH] [--select-popups]
 
             Notes:
               This does not open a new route and does not submit. It is useful when an
               agent has already navigated the native app, manually selected a topic, or
               needs to retry the visible form fill after changing native-only fields.
 
-              --select-popups asks the bundled AppleScript to select known area/type
-              popups. Some Apple forms use topic-specific popup labels, so inspect the
-              native UI afterward.
-
-              --background avoids activating Feedback Assistant, but only for text-field
-              filling. Popups, attachments, and Submit are foreground-only operations on
-              the user's current Mac desktop.
+              --select-popups asks the AX driver to select known area/type popups. Some
+              Apple forms use topic-specific popup labels, so inspect the native UI
+              afterward.
             """
         )
     }

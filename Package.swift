@@ -20,10 +20,7 @@ let package = Package(
         ),
         .executableTarget(
             name: "relato",
-            dependencies: ["RelatoKit"],
-            resources: [
-                .process("Resources")
-            ]
+            dependencies: ["RelatoKit"]
         ),
         .testTarget(
             name: "RelatoKitTests",

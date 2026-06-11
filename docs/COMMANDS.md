@@ -49,10 +49,10 @@ Commands:
   relato categorize --title TEXT [--description TEXT] [--bundle-id ID]
   relato prepare --title TEXT --description TEXT [--snapshot PATH] [--bundle-id ID] [--kind bug|suggestion] [--output-dir DIR]
   relato routes
-  relato open ROUTE [--id ID] [--print-only] [--background]
-  relato open-native [--payload PATH] [--background]
-  relato fill [--payload PATH] [--select-popups] [--script PATH] [--background]
-  relato submit [--payload PATH] [--select-popups] [--script PATH] [--wait-seconds N] [--verify-wait-seconds N] [--db PATH] [--confirm] [--verify-store] [--dry-run] [--background]
+  relato open ROUTE [--id ID] [--print-only]
+  relato open-native [--payload PATH]
+  relato fill [--payload PATH] [--select-popups]
+  relato submit [--payload PATH] [--select-popups] [--wait-seconds N] [--verify-wait-seconds N] [--db PATH] [--confirm] [--verify-store] [--dry-run]
 
 Help topics:
   relato help payload
@@ -64,8 +64,7 @@ Help topics:
 Safety:
   `--confirm` clicks the visible native Submit button. It is not headless
   submission and local store verification is not an Apple server receipt.
-  `--background` is a low-interruption text-fill mode, not full background
-  submission. Native popups, file attachments, and Submit require foreground UI.
+  Native form automation uses macOS Accessibility APIs, not AppleScript.
 ```
 
 To regenerate:
@@ -84,10 +83,10 @@ make generate-command-docs
 - `relato categorize --title TEXT [--description TEXT] [--bundle-id ID]`
 - `relato prepare --title TEXT --description TEXT [--snapshot PATH] [--bundle-id ID] [--kind bug|suggestion] [--output-dir DIR]`
 - `relato routes`
-- `relato open ROUTE [--id ID] [--print-only] [--background]`
-- `relato open-native [--payload PATH] [--background]`
-- `relato fill [--payload PATH] [--select-popups] [--script PATH] [--background]`
-- `relato submit [--payload PATH] [--select-popups] [--script PATH] [--wait-seconds N] [--verify-wait-seconds N] [--db PATH] [--confirm] [--verify-store] [--dry-run] [--background]`
+- `relato open ROUTE [--id ID] [--print-only]`
+- `relato open-native [--payload PATH]`
+- `relato fill [--payload PATH] [--select-popups]`
+- `relato submit [--payload PATH] [--select-popups] [--wait-seconds N] [--verify-wait-seconds N] [--db PATH] [--confirm] [--verify-store] [--dry-run]`
 
 ## Topic Help
 
@@ -173,7 +172,7 @@ Agent pattern:
 relato submit: open/fill Feedback Assistant and optionally click native Submit
 
 Usage:
-  relato submit [--payload PATH] [--select-popups] [--script PATH] [--wait-seconds N] [--verify-wait-seconds N] [--db PATH] [--confirm] [--verify-store] [--dry-run] [--background]
+  relato submit [--payload PATH] [--select-popups] [--wait-seconds N] [--verify-wait-seconds N] [--db PATH] [--confirm] [--verify-store] [--dry-run]
 
 Default behavior:
   Without `--confirm`, this opens Feedback Assistant, fills the visible native
@@ -190,20 +189,17 @@ Verification:
   --db PATH             Override the local Feedback Assistant SQLite path.
   --dry-run             Print the planned native handoff without opening,
                         filling, attaching, or submitting.
-  --background          Open in the background and set text fields without
-                        activation. Not compatible with --select-popups,
-                        --confirm, or payloads with attachments.
 
 Native form reality:
   Apple can add topic-specific required fields, popups, diagnostics, or log
   gathering. Agents should inspect the visible app before `--confirm`; the
   local store check is useful evidence but not a server-side receipt.
-  macOS does not provide true same-desktop background GUI submission for
-  Feedback Assistant. Use a separate GUI session or VM for fully isolated UI.
+  RelatoKit uses Accessibility elements directly for native UI automation.
+  Some controls can still require visible app review because Apple owns the
+  final native form.
 
 Agent pattern:
   relato submit --payload feedback-submission.json --dry-run --confirm
-  relato submit --payload text-only-feedback.json --background
   relato submit --payload feedback-submission.json --select-popups
   # inspect native UI and satisfy Apple-only fields
   relato submit --payload feedback-submission.json --confirm --verify-store
@@ -217,20 +213,16 @@ Agent pattern:
 relato fill: fill the currently open Feedback Assistant draft
 
 Usage:
-  relato fill [--payload PATH] [--select-popups] [--script PATH] [--background]
+  relato fill [--payload PATH] [--select-popups]
 
 Notes:
   This does not open a new route and does not submit. It is useful when an
   agent has already navigated the native app, manually selected a topic, or
   needs to retry the visible form fill after changing native-only fields.
 
-  --select-popups asks the bundled AppleScript to select known area/type
-  popups. Some Apple forms use topic-specific popup labels, so inspect the
-  native UI afterward.
-
-  --background avoids activating Feedback Assistant, but only for text-field
-  filling. Popups, attachments, and Submit are foreground-only operations on
-  the user's current Mac desktop.
+  --select-popups asks the AX driver to select known area/type popups. Some
+  Apple forms use topic-specific popup labels, so inspect the native UI
+  afterward.
 ```
 
 ### `relato help store`
