@@ -139,10 +139,10 @@ relato categories [--db PATH]
 relato categorize --title TEXT [--description TEXT] [--bundle-id ID]
 relato prepare --title TEXT --description TEXT [--snapshot PATH] [--bundle-id ID] [--kind bug|suggestion] [--output-dir DIR]
 relato routes
-relato open ROUTE [--id ID] [--print-only]
-relato open-native [--payload PATH]
-relato fill [--payload PATH] [--select-popups] [--script PATH]
-relato submit [--payload PATH] [--select-popups] [--script PATH] [--wait-seconds N] [--verify-wait-seconds N] [--db PATH] [--confirm] [--verify-store] [--dry-run]
+relato open ROUTE [--id ID] [--print-only] [--background]
+relato open-native [--payload PATH] [--background]
+relato fill [--payload PATH] [--select-popups] [--script PATH] [--background]
+relato submit [--payload PATH] [--select-popups] [--script PATH] [--wait-seconds N] [--verify-wait-seconds N] [--db PATH] [--confirm] [--verify-store] [--dry-run] [--background]
 relato version
 ```
 
@@ -154,6 +154,17 @@ relato help submit
 relato help fill
 relato help store
 ```
+
+Low-interruption mode:
+
+```sh
+relato open-native --payload feedback-submission.json --background
+relato fill --payload feedback-submission.json --background
+```
+
+`--background` avoids activating Feedback Assistant for background-safe text field filling. Native topic selection, popups, file attachments, and the final Submit click still require foreground UI on the current Mac desktop.
+
+For the underlying automation model, see [docs/BACKGROUND_AUTOMATION.md](docs/BACKGROUND_AUTOMATION.md).
 
 ## Current Status
 
@@ -181,6 +192,7 @@ make check
 ## Documentation
 
 - [docs/COMMANDS.md](docs/COMMANDS.md) - generated command reference
+- [docs/BACKGROUND_AUTOMATION.md](docs/BACKGROUND_AUTOMATION.md) - background automation notes
 - [CHANGELOG.md](CHANGELOG.md) - release notes
 - [CONTRIBUTING.md](CONTRIBUTING.md) - development workflow
 - [SUPPORT.md](SUPPORT.md) - support checklist

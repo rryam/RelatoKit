@@ -8,13 +8,18 @@ on run argv
   set bundleID to item 7 of argv
   set shouldSelectPopups to item 8 of argv
   set shouldSubmit to item 9 of argv
+  set shouldActivate to item 10 of argv
 
-  tell application "Feedback Assistant" to activate
-  delay 0.5
+  if shouldActivate is "true" then
+    tell application "Feedback Assistant" to activate
+    delay 0.5
+  end if
 
   tell application "System Events"
     tell process "Feedback Assistant"
-      set frontmost to true
+      if shouldActivate is "true" then
+        set frontmost to true
+      end if
       set targetWindow to window 1
       set targetScroll to scroll area 1 of targetWindow
 
