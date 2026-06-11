@@ -21,3 +21,16 @@ import Testing
     #expect(category.topic == "macOS")
     #expect(category.classification == "public.macos")
 }
+
+@Test func foundationModelsMapsToSpecificFrameworkArea() {
+    let inferer = FeedbackCategoryInferer(bundleMappingPath: "/missing")
+    let category = inferer.infer(
+        title: "Foundation Models framework should accept video input",
+        description: "LanguageModel and tool calling should support temporal media."
+    )
+
+    #expect(category.topic == "Developer Technologies & SDKs")
+    #expect(category.tat == "dev.tech")
+    #expect(category.area == "Foundation Models Framework")
+    #expect(category.classification == "seed:foundationmodelsframework")
+}

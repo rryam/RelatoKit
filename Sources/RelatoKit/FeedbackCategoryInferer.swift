@@ -32,8 +32,9 @@ public struct FeedbackCategoryInferer {
     public init(bundleMappingPath: String = Self.defaultBundleMappingPath) {
         self.bundleMappingPath = bundleMappingPath
         self.rules = [
+            Rule(topic: "Developer Technologies & SDKs", tat: "dev.tech", area: "Foundation Models Framework", keywords: ["foundation models", "foundationmodels", "language model", "generable", "tool calling"]),
             Rule(topic: "Developer Tools & Resources", tat: "developertools.fba", area: "Xcode", keywords: ["xcode", "testflight", "app store connect", "simulator", "xctest", "swift compiler", "developer tools"]),
-            Rule(topic: "Developer Technologies & SDKs", tat: "dev.tech", area: "APIs and Frameworks", keywords: ["swiftui", "uikit", "appkit", "foundation", "framework", "api", "sdk", "swiftdata", "foundation models"]),
+            Rule(topic: "Developer Technologies & SDKs", tat: "dev.tech", area: "APIs and Frameworks", keywords: ["swiftui", "uikit", "appkit", "foundation", "framework", "api", "sdk", "swiftdata"]),
             Rule(topic: "macOS", tat: "public.macos", area: "Something else not on this list", keywords: ["macos", "finder", "safari", "mail", "notes", "desktop", "system settings"]),
             Rule(topic: "iOS & iPadOS", tat: "public.ios", area: "Something else not on this list", keywords: ["ios", "ipados", "iphone", "ipad", "uikit"]),
             Rule(topic: "watchOS", tat: "watchos.public", area: "Something else not on this list", keywords: ["watchos", "apple watch", "watch"]),
@@ -86,7 +87,7 @@ public struct FeedbackCategoryInferer {
                 topic: bestRule.topic,
                 tat: bestRule.tat,
                 area: bestRule.area,
-                classification: bestRule.topic == "Developer Tools & Resources" ? "seedx:xcode" : bestRule.tat,
+                classification: classification(for: bestRule),
                 reason: "matched \(bestScore) keyword(s)"
             )
         }
@@ -108,5 +109,17 @@ public struct FeedbackCategoryInferer {
             return [:]
         }
         return mapping
+    }
+
+    private func classification(for rule: Rule) -> String {
+        if rule.topic == "Developer Tools & Resources" {
+            return "seedx:xcode"
+        }
+
+        if rule.area == "Foundation Models Framework" {
+            return "seed:foundationmodelsframework"
+        }
+
+        return rule.tat
     }
 }
