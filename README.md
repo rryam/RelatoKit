@@ -12,6 +12,8 @@ RelatoKit (from the Portuguese `relato`, meaning report or account) provides a l
 
 RelatoKit keeps authentication, diagnostics, and final submission inside Feedback Assistant. It does not bypass entitlements, disable platform security, forge Apple credentials, or submit feedback without the explicit `--confirm` flag.
 
+The CLI is optimized for agent workflows: create a machine-readable JSON payload, review the generated Markdown report, open and fill the native app, inspect Apple-only fields, and click Submit only after explicit confirmation.
+
 ```sh
 relato prepare \
   --title "Xcode canvas stops updating after file rename" \
@@ -100,6 +102,13 @@ relato prepare \
   --kind bug
 ```
 
+`relato prepare` writes two files:
+
+- `feedback-submission.json` - the machine-readable payload used by `relato open-native`, `relato fill`, and `relato submit`
+- `feedback-submission.md` - the human-readable report for agent review, logs, notes, or evidence attachments
+
+`--snapshot` can point to any local evidence file, including a screenshot, Markdown note, log, sample project archive, or sysdiagnose pointer.
+
 Open and fill the native app:
 
 ```sh
@@ -135,6 +144,15 @@ relato open-native [--payload PATH]
 relato fill [--payload PATH] [--select-popups] [--script PATH]
 relato submit [--payload PATH] [--select-popups] [--script PATH] [--wait-seconds N] [--verify-wait-seconds N] [--db PATH] [--confirm] [--verify-store] [--dry-run]
 relato version
+```
+
+Agent-oriented help:
+
+```sh
+relato help payload
+relato help submit
+relato help fill
+relato help store
 ```
 
 ## Current Status

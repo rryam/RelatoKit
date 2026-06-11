@@ -17,3 +17,4 @@ All notable changes to RelatoKit will be documented in this file.
 - Improved native form filling for the Feedback Assistant topic chooser, loading state, popups, bundle ID fields, and local attachments.
 - Improved CLI validation for unknown arguments, invalid `--kind` values, numeric options, malformed payloads, and non-Feedback Assistant payload URLs.
 - Added URL and route tests for prepared feedback payloads.
+- Expanded `relato --help`, topic help, and generated command docs for agent-oriented payload and submit workflows.
