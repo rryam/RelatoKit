@@ -22,4 +22,4 @@ All notable changes to RelatoKit will be documented in this file.
 - Moved native Feedback Assistant automation to an Objective-C Accessibility/CoreGraphics engine and added fail-closed handling for unsupported local attachment pickers.
 - Added process-targeted CoreGraphics text routing, matching the public `CGEventPostToPid` background keyboard pattern used by macOS automation tools.
 - Added background local attachment staging into Feedback Assistant draft folders and removed foreground attachment picker automation.
-- Added PID/window-routed CoreGraphics mouse events inspired by Peekaboo-style background input delivery.
+- Removed synthetic mouse-event fallbacks from the production native automation path.

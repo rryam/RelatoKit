@@ -7,7 +7,7 @@ public enum FeedbackAssistantApp {
     }
 
     public static func open(_ url: URL) throws {
-        try run("/usr/bin/open", arguments: ["-g", "-b", FeedbackRoutes.appBundleIdentifier, url.absoluteString])
+        try run("/usr/bin/open", arguments: ["-g", "-j", "-b", FeedbackRoutes.appBundleIdentifier, url.absoluteString])
     }
 
     @discardableResult

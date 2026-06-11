@@ -9,8 +9,8 @@ The AX driver works by:
 3. Matching controls by role, title, description, and value.
 4. Attempting text fields and text areas through `AXValue`.
 5. Trying named actions such as `AXPress` and `AXShowMenu` before synthetic input.
-6. Routing text through public process-targeted CoreGraphics events with `CGEventPostToPid`.
-7. Using SkyLight per-PID event posting for stubborn controls that reject public process-targeted events.
+6. Routing text through public process-targeted CoreGraphics keyboard events with `CGEventPostToPid`.
+7. Using SkyLight per-PID keyboard event posting when public targeting is not enough.
 8. Staging local snapshots into the active Feedback Assistant draft folder after the native draft exists.
 9. Failing closed instead of foregrounding Feedback Assistant when a native control refuses background automation.
 10. Stopping before final submission unless `--confirm` is explicitly provided.

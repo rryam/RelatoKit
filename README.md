@@ -156,7 +156,7 @@ relato help fill
 relato help store
 ```
 
-Native form automation uses an Objective-C Accessibility/CoreGraphics engine with background-first input. RelatoKit uses AX to locate controls, tries named AX actions such as `AXPress` and `AXShowMenu`, routes text through process-targeted CoreGraphics events, and uses SkyLight per-PID event posting when public targeting is not enough. Local snapshots are staged into Feedback Assistant's local draft folder after the native draft exists, which avoids opening the Add Attachment menu on the user's desktop. RelatoKit does not foreground Feedback Assistant; if the native app refuses a background action, it fails closed. It stops for review unless `--confirm` is explicitly provided.
+Native form automation uses an Objective-C Accessibility/CoreGraphics engine with background-first input. RelatoKit uses AX to locate controls, tries named AX actions such as `AXPress` and `AXShowMenu`, routes text through process-targeted CoreGraphics keyboard events, and uses SkyLight per-PID keyboard event posting when public targeting is not enough. Local snapshots are staged into Feedback Assistant's local draft folder after the native draft exists, which avoids opening the Add Attachment menu on the user's desktop. RelatoKit does not foreground Feedback Assistant; if the native app refuses a background action, it fails closed. It stops for review unless `--confirm` is explicitly provided.
 
 For the automation model, see [docs/AX_AUTOMATION.md](docs/AX_AUTOMATION.md).
 

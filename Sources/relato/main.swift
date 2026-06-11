@@ -496,7 +496,7 @@ enum RelatoCLI {
               `--confirm` clicks the visible native Submit button. It is not headless
               submission and local store verification is not an Apple server receipt.
               Native form automation uses an Objective-C Accessibility/CoreGraphics engine
-              with action-first AX and process-targeted CoreGraphics/SkyLight delivery.
+              with action-first AX and process-targeted CoreGraphics/SkyLight keyboard delivery.
               Snapshot attachments are staged into the local Feedback Assistant draft
               folder in the background after the native draft exists.
             """
@@ -572,8 +572,8 @@ enum RelatoCLI {
               gathering. Agents should inspect the visible app before `--confirm`; the
               local store check is useful evidence but not a server-side receipt.
               RelatoKit uses an Objective-C Accessibility/CoreGraphics engine for native UI automation.
-              Text is routed through process-targeted CoreGraphics events. Snapshot attachments
-              are staged into the local Feedback Assistant draft folder after the native draft
+              Text is routed through process-targeted CoreGraphics/SkyLight keyboard events.
+              Snapshot attachments are staged into the local Feedback Assistant draft folder after the native draft
               exists, avoiding the Add Attachment picker. RelatoKit fails closed instead of
               foregrounding Feedback Assistant when a native control refuses background automation.
 

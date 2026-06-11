@@ -18,53 +18,9 @@ static int RFAFail(char **errorOut, NSString *message) {
 
 typedef void (*RFASLEventPostToPidFunction)(pid_t pid, CGEventRef event);
 
-static CGWindowID RFAWindowIDContainingPoint(CGPoint point, pid_t pid) {
-    CFArrayRef windowInfo = CGWindowListCopyWindowInfo(
-        kCGWindowListOptionOnScreenOnly | kCGWindowListExcludeDesktopElements,
-        kCGNullWindowID
-    );
-    if (windowInfo == NULL) { return 0; }
-
-    CGWindowID result = 0;
-    CFIndex count = CFArrayGetCount(windowInfo);
-    for (CFIndex index = 0; index < count; index++) {
-        NSDictionary *window = (__bridge NSDictionary *)CFArrayGetValueAtIndex(windowInfo, index);
-        NSNumber *ownerPID = window[(__bridge NSString *)kCGWindowOwnerPID];
-        NSNumber *layer = window[(__bridge NSString *)kCGWindowLayer];
-        NSNumber *windowNumber = window[(__bridge NSString *)kCGWindowNumber];
-        NSDictionary *boundsDictionary = window[(__bridge NSString *)kCGWindowBounds];
-        if (ownerPID == nil || layer == nil || windowNumber == nil || boundsDictionary == nil) {
-            continue;
-        }
-        if (ownerPID.intValue != pid || layer.intValue != 0) {
-            continue;
-        }
-
-        CGRect bounds = CGRectZero;
-        if (!CGRectMakeWithDictionaryRepresentation((__bridge CFDictionaryRef)boundsDictionary, &bounds)) {
-            continue;
-        }
-        if (CGRectContainsPoint(bounds, point)) {
-            result = (CGWindowID)windowNumber.unsignedIntValue;
-            break;
-        }
-    }
-
-    CFRelease(windowInfo);
-    return result;
-}
-
 static void RFAStampEventForPid(CGEventRef event, pid_t pid) {
     if (event == NULL || pid <= 0) { return; }
     CGEventSetIntegerValueField(event, kCGEventTargetUnixProcessID, pid);
-}
-
-static void RFAStampMouseEventForPid(CGEventRef event, CGPoint point, pid_t pid) {
-    RFAStampEventForPid(event, pid);
-    CGWindowID windowID = RFAWindowIDContainingPoint(point, pid);
-    if (windowID == 0) { return; }
-    CGEventSetIntegerValueField(event, kCGMouseEventWindowUnderMousePointer, windowID);
-    CGEventSetIntegerValueField(event, kCGMouseEventWindowUnderMousePointerThatCanHandleThisEvent, windowID);
 }
 
 static RFASLEventPostToPidFunction RFASkyLightPostToPid(void) {
@@ -255,38 +211,6 @@ static BOOL RFAPointAndSize(AXUIElementRef element, CGPoint *point, CGSize *size
     return ok;
 }
 
-static CGPoint RFAMouseEventPoint(CGPoint point) {
-    return point;
-}
-
-static BOOL RFAClickElementAtRatioToPid(AXUIElementRef element, CGFloat xRatio, CGFloat yRatio, pid_t pid) {
-    CGPoint origin = CGPointZero;
-    CGSize size = CGSizeZero;
-    if (!RFAPointAndSize(element, &origin, &size)) { return NO; }
-    CGPoint point = RFAMouseEventPoint(CGPointMake(origin.x + size.width * xRatio, origin.y + size.height * yRatio));
-    CGEventRef down = CGEventCreateMouseEvent(NULL, kCGEventLeftMouseDown, point, kCGMouseButtonLeft);
-    CGEventRef up = CGEventCreateMouseEvent(NULL, kCGEventLeftMouseUp, point, kCGMouseButtonLeft);
-    if (down == NULL || up == NULL) {
-        if (down != NULL) { CFRelease(down); }
-        if (up != NULL) { CFRelease(up); }
-        return NO;
-    }
-    CGEventSetIntegerValueField(down, kCGMouseEventClickState, 1);
-    CGEventSetIntegerValueField(up, kCGMouseEventClickState, 1);
-    RFAStampMouseEventForPid(down, point, pid);
-    RFAStampMouseEventForPid(up, point, pid);
-    RFAPostEventToPid(down, pid);
-    RFAPostEventToPid(up, pid);
-    CFRelease(down);
-    CFRelease(up);
-    [NSThread sleepForTimeInterval:0.25];
-    return YES;
-}
-
-static BOOL RFAClickElementToPid(AXUIElementRef element, pid_t pid) {
-    return RFAClickElementAtRatioToPid(element, 0.5, 0.5, pid);
-}
-
 static BOOL RFAPress(AXUIElementRef element) {
     return AXUIElementPerformAction(element, kAXPressAction) == kAXErrorSuccess;
 }
@@ -432,7 +356,6 @@ static int RFASelectPopup(AXUIElementRef root, NSArray<NSString *> *labels, NSSt
 
         RFAScrollElementToVisible(popup);
         RFAPerformActionOnElementOrChild(popup, CFSTR("AXShowMenu"));
-        RFAClickElementToPid(popup, runningApp.processIdentifier);
         RFAPerformActionOnElementOrChild(popup, kAXPressAction);
         [NSThread sleepForTimeInterval:0.5];
         AXUIElementRef systemWide = AXUIElementCreateSystemWide();
@@ -444,8 +367,7 @@ static int RFASelectPopup(AXUIElementRef root, NSArray<NSString *> *labels, NSSt
                 return ([role isEqualToString:NSAccessibilityMenuItemRole] || [role isEqualToString:NSAccessibilityStaticTextRole]) && RFAMatches(element, value);
             });
             BOOL pressed = item != NULL &&
-                (RFAPressActionOnly(item) ||
-                 RFAClickElementToPid(item, runningApp.processIdentifier));
+                RFAPressActionOnly(item);
             if (pressed) {
                 [NSThread sleepForTimeInterval:0.25];
                 if ([RFAAttributeString(popup, kAXValueAttribute) rangeOfString:value options:NSCaseInsensitiveSearch].location != NSNotFound) {
