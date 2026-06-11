@@ -88,7 +88,13 @@ public struct FeedbackCategoryInferer {
             Self.macOSArea("Apple Intelligence", "seed:appleintelligence", ["apple intelligence"]),
             Self.macOSArea("Image Playground", "seedmacos:imageplayground", ["image playground"]),
             Self.macOSArea("Feedback Assistant", "seedx:fba", ["feedback assistant", "feedbackassistant"]),
-            Self.macOSArea("Something else not on this list", "public.macos", ["macos", "desktop"]),
+            Self.macOSArea("Something else not on this list", "public.macos", ["macos"]),
+
+            Self.topLevel("AirPods Beta Firmware", "airpods", ["airpods", "airpod", "airpods firmware"]),
+            Self.topLevel("HomePod", ":B238", ["homepod", "home pod"]),
+            Self.topLevel("Enterprise & Education", "ent.edu", ["enterprise", "education", "device management", "mdm", "school manager", "business manager"]),
+            Self.topLevel("MFi Technologies", "mfi", ["mfi", "made for iphone", "external accessory certification"]),
+            Self.topLevel("DMA Interoperability", "interop", ["dma", "interoperability", "european union"]),
 
             Rule(topic: "iOS & iPadOS", tat: "public.ios", area: "Something else not on this list", classification: "public.ios", keywords: ["ios", "ipados", "iphone", "ipad"]),
             Rule(topic: "watchOS", tat: "watchos.public", area: "Something else not on this list", classification: "watchos.public", keywords: ["watchos", "apple watch", "watch"]),
@@ -102,24 +108,8 @@ public struct FeedbackCategoryInferer {
         let mapping = loadBundleMapping()
 
         if let bundleID, let mapped = mapping[bundleID] {
-            if mapped == "seedx:xcode" {
-                return FeedbackCategory(
-                    topic: "Developer Tools & Resources",
-                    tat: "developertools.fba",
-                    area: "Xcode",
-                    classification: mapped,
-                    reason: "bundle mapping \(bundleID) -> \(mapped)"
-                )
-            }
-
-            if mapped.hasPrefix("seedx:") {
-                return FeedbackCategory(
-                    topic: "macOS",
-                    tat: "public.macos",
-                    area: String(mapped.dropFirst("seedx:".count)),
-                    classification: mapped,
-                    reason: "bundle mapping \(bundleID) -> \(mapped)"
-                )
+            if let mappedRule = rules.first(where: { $0.classification.caseInsensitiveCompare(mapped) == .orderedSame }) {
+                return category(from: mappedRule, reason: "bundle mapping \(bundleID) -> \(mapped)")
             }
         }
 
@@ -136,13 +126,7 @@ public struct FeedbackCategoryInferer {
         }
 
         if let bestRule {
-            return FeedbackCategory(
-                topic: bestRule.topic,
-                tat: bestRule.tat,
-                area: bestRule.area,
-                classification: bestRule.classification,
-                reason: "matched \(bestScore) keyword(s)"
-            )
+            return category(from: bestRule, reason: "matched \(bestScore) keyword(s)")
         }
 
         return FeedbackCategory(
@@ -162,6 +146,16 @@ public struct FeedbackCategoryInferer {
             return [:]
         }
         return mapping
+    }
+
+    private func category(from rule: Rule, reason: String) -> FeedbackCategory {
+        FeedbackCategory(
+            topic: rule.topic,
+            tat: rule.tat,
+            area: rule.area,
+            classification: rule.classification,
+            reason: reason
+        )
     }
 
     private static func developerTechnology(_ area: String, _ classification: String, _ keywords: [String]) -> Rule {
@@ -190,6 +184,16 @@ public struct FeedbackCategoryInferer {
             tat: "public.macos",
             area: area,
             classification: classification,
+            keywords: keywords
+        )
+    }
+
+    private static func topLevel(_ topic: String, _ tat: String, _ keywords: [String]) -> Rule {
+        Rule(
+            topic: topic,
+            tat: tat,
+            area: "Something else not on this list",
+            classification: tat,
             keywords: keywords
         )
     }

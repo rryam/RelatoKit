@@ -92,6 +92,8 @@ relato categorize \
   --bundle-id com.apple.dt.Xcode
 ```
 
+RelatoKit uses curated mappings for common Feedback Assistant destinations, including macOS app/system areas, Developer Tools areas, Developer Technologies frameworks, and top-level platform forms such as iOS & iPadOS, watchOS, tvOS, visionOS, HomePod, AirPods, Enterprise & Education, MFi, and DMA Interoperability.
+
 Prepare a report:
 
 ```sh
