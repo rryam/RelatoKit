@@ -7,6 +7,7 @@ int RelatoFeedbackAssistantFill(
     const char *title,
     const char *description,
     const char *topic,
+    const char *platform,
     const char *area,
     const char *kind,
     const char *snapshot,

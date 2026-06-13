@@ -20,10 +20,11 @@ relato prepare \
   --description "Steps, expected result, actual result." \
   --snapshot ./snapshot.png \
   --bundle-id com.apple.dt.Xcode \
+  --platform macOS \
   --kind bug
 
-relato submit --payload feedback-submission.json --dry-run
-relato submit --payload feedback-submission.json
+relato submit --payload feedback-submission.json --select-popups --dry-run
+relato submit --payload feedback-submission.json --select-popups
 ```
 
 ## Requirements
@@ -50,7 +51,7 @@ Add the library to another Swift package:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/rryam/RelatoKit.git", branch: "main")
+    .package(url: "https://github.com/rryam/RelatoKit.git", from: "0.2.0")
 ]
 ```
 
@@ -66,7 +67,7 @@ RelatoKit gives you a small command-line workflow around the native Feedback Ass
 - topic and area inference from title, description, bundle identifier, and curated Feedback Assistant area mappings
 - JSON and Markdown report preparation
 - native Feedback Assistant route launching
-- AX-driven title, description, bundle ID, fail-closed popup handling, and submit handoff
+- AX-driven title, description, bundle ID, platform/technology/type popup selection, and submit handoff
 - background local attachment staging into Feedback Assistant draft folders
 - fail-closed behavior when native controls require focus, keyboard, or pointer ownership
 
@@ -102,6 +103,7 @@ relato prepare \
   --description "Steps to reproduce, expected result, and actual result." \
   --snapshot ./snapshot.png \
   --bundle-id com.apple.dt.Xcode \
+  --platform macOS \
   --kind bug
 ```
 
@@ -110,23 +112,23 @@ relato prepare \
 - `feedback-submission.json` - the machine-readable payload used by `relato open-native`, `relato fill`, and `relato submit`
 - `feedback-submission.md` - the human-readable report for agent review, logs, notes, or evidence attachments
 
-`--snapshot` can point to any local evidence file, including a screenshot, Markdown note, log, sample project archive, or sysdiagnose pointer.
+`--snapshot` can point to any local evidence file, including a screenshot, Markdown note, log, sample project archive, or sysdiagnose pointer. `--platform` accepts `iOS`, `iPadOS`, `Mac Catalyst`, `macOS`, `tvOS`, `visionOS`, `watchOS`, or `Web & Services`; it is inferred from the title and description when omitted.
 
 Open and fill the native app:
 
 ```sh
 relato open-native --payload feedback-submission.json
-relato fill --payload feedback-submission.json
+relato fill --payload feedback-submission.json --select-popups
 ```
 
 Submit through the native app with explicit confirmation:
 
 ```sh
-relato submit --payload feedback-submission.json --dry-run
-relato submit --payload feedback-submission.json --confirm
+relato submit --payload feedback-submission.json --select-popups --dry-run
+relato submit --payload feedback-submission.json --select-popups --confirm
 ```
 
-Without `--confirm`, `relato submit` opens Feedback Assistant without activation, fills the fields it can safely set, hides the app again, stages the snapshot, and stops before Submit.
+Without `--confirm`, `relato submit` fills the fields it can safely set, hides Feedback Assistant again, stages the snapshot, and stops before Submit. When `--select-popups` is present, Feedback Assistant is briefly activated so Accessibility can select native platform, technology, and feedback-type menu items.
 
 With `--confirm`, RelatoKit asks the signed-in native app to press Submit through Accessibility, then performs best-effort local store verification. This check can show local store changes and matching recent items, but it is not a server-side receipt from Apple.
 
@@ -140,7 +142,7 @@ relato store list [--limit N] [--db PATH]
 relato store uploads [--limit N] [--db PATH]
 relato categories [--db PATH]
 relato categorize --title TEXT [--description TEXT] [--bundle-id ID]
-relato prepare --title TEXT --description TEXT [--snapshot PATH] [--bundle-id ID] [--kind bug|suggestion] [--output-dir DIR]
+relato prepare --title TEXT --description TEXT [--snapshot PATH] [--bundle-id ID] [--platform PLATFORM] [--kind bug|suggestion] [--output-dir DIR]
 relato routes
 relato open ROUTE [--id ID] [--print-only]
 relato open-native [--payload PATH]
@@ -160,11 +162,11 @@ relato help store
 
 ## Automation Model
 
-RelatoKit uses an Objective-C Accessibility engine for native form automation. It opens Feedback Assistant without activation, hides it after launch or fill, and writes supported text fields through passive AX value updates. It does not synthesize mouse movement, pointer clicks, or keyboard input for the normal fill path.
+RelatoKit uses an Objective-C Accessibility engine for native form automation. It writes supported text fields through passive AX value updates. With `--select-popups`, it briefly activates Feedback Assistant and uses native AX menu actions to select platform, technology, and feedback type. It does not synthesize mouse movement, pointer clicks, or keyboard input.
 
 Local snapshots are staged into Feedback Assistant's local draft folder after the native draft exists. This avoids driving the visible Add Attachment menu and keeps the user's active app undisturbed where macOS allows it.
 
-Some Feedback Assistant controls are native-only by design. Topic-specific popups, diagnostics prompts, device selections, and log-gathering flows may require review inside Apple's app. When a control cannot be completed safely in the background, RelatoKit fails closed instead of taking over focus, keyboard, or pointer ownership.
+Some Feedback Assistant controls are native-only by design. Diagnostics prompts, device selections, and log-gathering flows may still require review inside Apple's app. When a requested control or menu item is unavailable, RelatoKit fails closed instead of pretending the form was completed.
 
 For the automation model, see [docs/AX_AUTOMATION.md](docs/AX_AUTOMATION.md).
 
@@ -179,7 +181,7 @@ RelatoKit intentionally stays on the native Feedback Assistant side of the workf
 
 ## Maturity
 
-RelatoKit is pre-1.0. The stable surface is report preparation, local store inspection, native route launch, hidden text-field fill, local attachment staging, explicit native submit handoff, and best-effort local verification. Research probes live under `Research/` and are not part of the SwiftPM build.
+RelatoKit is pre-1.0. The stable surface is report preparation, local store inspection, native route launch, text-field fill, native popup selection, local attachment staging, explicit native submit handoff, and best-effort local verification. Research probes live under `Research/` and are not part of the SwiftPM build.
 
 ## Non-Goals
 

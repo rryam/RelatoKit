@@ -2,7 +2,7 @@ import Foundation
 import RelatoKit
 
 enum RelatoCLI {
-    static let version = "0.1.0-dev"
+    static let version = "0.2.0"
 
     static func run(_ rawArguments: [String]) throws {
         var arguments = rawArguments
@@ -110,6 +110,7 @@ enum RelatoCLI {
         let title = try requireOption("--title", from: &arguments)
         let description = try requireOption("--description", from: &arguments)
         let bundleID = try takeOption("--bundle-id", from: &arguments)
+        let requestedPlatform = try takeOption("--platform", from: &arguments)
         let kindValue = try takeOption("--kind", from: &arguments) ?? "bug"
         guard let kind = FeedbackKind(rawValue: kindValue) else {
             throw RelatoError.invalidArgument("Invalid value for --kind: \(kindValue). Expected bug or suggestion.")
@@ -126,7 +127,26 @@ enum RelatoCLI {
         }
 
         let category = FeedbackCategoryInferer().infer(title: title, description: description, bundleID: bundleID)
-        let payload = try PreparedFeedback(title: title, description: description, snapshot: snapshot, bundleID: bundleID, kind: kind, category: category)
+        let platform: String?
+        if let requestedPlatform {
+            guard let normalized = FeedbackPlatformInferer.normalize(requestedPlatform) else {
+                throw RelatoError.invalidArgument(
+                    "Invalid value for --platform: \(requestedPlatform). Expected one of: \(FeedbackPlatformInferer.supportedPlatforms.joined(separator: ", "))."
+                )
+            }
+            platform = normalized
+        } else {
+            platform = FeedbackPlatformInferer().infer(title: title, description: description)
+        }
+        let payload = try PreparedFeedback(
+            title: title,
+            description: description,
+            snapshot: snapshot,
+            bundleID: bundleID,
+            kind: kind,
+            category: category,
+            platform: platform
+        )
 
         try FileManager.default.createDirectory(atPath: outputDir, withIntermediateDirectories: true)
         let jsonURL = URL(fileURLWithPath: outputDir).appendingPathComponent("feedback-submission.json")
@@ -185,7 +205,7 @@ enum RelatoCLI {
         if selectPopups {
             print("Set fields and selected requested popups through Accessibility. Review native-only fields and remember local verification is not an Apple server receipt.")
         } else {
-            print("Set fields through Accessibility. Select native popups if needed: area='\(payload.category.area)', kind='\(payload.kind.rawValue)'")
+            print("Set fields through Accessibility. Select native popups if needed: platform='\(payload.platform ?? "")', area='\(payload.category.area)', kind='\(payload.kind.rawValue)'")
         }
         printStagedAttachment(fillResult.stagedAttachment)
     }
@@ -412,6 +432,7 @@ enum RelatoCLI {
         print("  title:         \(payload.title)")
         print("  topic:         \(payload.category.topic)")
         print("  area:          \(payload.category.area)")
+        print("  platform:      \(payload.platform ?? "")")
         print("  kind:          \(payload.kind.rawValue)")
         print("  bundle ID:     \(payload.bundleID ?? "")")
         print("  snapshot:      \(payload.snapshot ?? "")")
@@ -465,8 +486,9 @@ enum RelatoCLI {
                    feedback-submission.json  machine-readable contract for relato
                    feedback-submission.md    human-readable report for review/logs
               3. Inspect the Markdown and JSON before touching the native app.
-              4. Run `relato submit --dry-run --payload feedback-submission.json`.
-              5. Run `relato submit --payload feedback-submission.json` to open/fill only.
+              4. Run `relato submit --dry-run --select-popups --payload feedback-submission.json`.
+              5. Run `relato submit --select-popups --payload feedback-submission.json`
+                 to open, fill, and select known native popups without submitting.
               6. Inspect Feedback Assistant for native-only fields, diagnostics, and files.
               7. Only after explicit user confirmation, run with `--confirm`.
               8. Use `relato store list` and `relato store uploads` as local evidence.
@@ -478,7 +500,7 @@ enum RelatoCLI {
               relato store uploads [--limit N] [--db PATH]
               relato categories [--db PATH]
               relato categorize --title TEXT [--description TEXT] [--bundle-id ID]
-              relato prepare --title TEXT --description TEXT [--snapshot PATH] [--bundle-id ID] [--kind bug|suggestion] [--output-dir DIR]
+              relato prepare --title TEXT --description TEXT [--snapshot PATH] [--bundle-id ID] [--platform PLATFORM] [--kind bug|suggestion] [--output-dir DIR]
               relato routes
               relato open ROUTE [--id ID] [--print-only]
               relato open-native [--payload PATH]
@@ -496,12 +518,11 @@ enum RelatoCLI {
               `--confirm` presses the native Submit button through Accessibility. It is not headless
               submission and local store verification is not an Apple server receipt.
               Native form automation uses an Objective-C Accessibility engine with passive
-              AX value writes for fields; it does not synthesize mouse or keyboard input.
-              Feedback Assistant is opened without activation and hidden after launch/fill.
+              AX value writes for fields and AX menu actions for requested popup selection.
+              Feedback Assistant is opened without activation. `--select-popups` briefly
+              activates it for menu selection, and the app is hidden after launch/fill.
               Snapshot attachments are staged into the local Feedback Assistant draft
               folder in the background after the native draft exists.
-              Cua/Peekaboo-style background input was tested: hidden text fields work,
-              Feedback Assistant SwiftUI popups still fail closed.
             """
         )
     }
@@ -512,7 +533,7 @@ enum RelatoCLI {
             relato prepare: create the payload pair agents should review and reuse
 
             Usage:
-              relato prepare --title TEXT --description TEXT [--snapshot PATH] [--bundle-id ID] [--kind bug|suggestion] [--output-dir DIR]
+              relato prepare --title TEXT --description TEXT [--snapshot PATH] [--bundle-id ID] [--platform PLATFORM] [--kind bug|suggestion] [--output-dir DIR]
 
             Outputs:
               feedback-submission.json
@@ -529,6 +550,10 @@ enum RelatoCLI {
               --snapshot PATH       Local evidence attachment. This can be a screenshot,
                                     Markdown note, log, sysdiagnose pointer, or sample file.
               --bundle-id ID        App bundle ID when relevant.
+              --platform VALUE      Native platform label. Inferred from the title and
+                                    description when omitted.
+                                    Values: iOS, iPadOS, Mac Catalyst, macOS, tvOS,
+                                    visionOS, watchOS, or Web & Services.
               --kind VALUE          bug or suggestion. Defaults to bug.
               --output-dir DIR      Where to write the JSON and Markdown files.
 
@@ -555,8 +580,9 @@ enum RelatoCLI {
               relato submit [--payload PATH] [--select-popups] [--wait-seconds N] [--verify-wait-seconds N] [--db PATH] [--confirm] [--verify-store] [--dry-run]
 
             Default behavior:
-              Without `--confirm`, this opens Feedback Assistant without activation, fills
-              the native form from the JSON payload, hides the app, and stops before Submit.
+              Without `--confirm`, this fills the native form from the JSON payload, hides
+              the app, and stops before Submit. Without `--select-popups`, Feedback Assistant
+              is opened without activation. Popup selection briefly activates the app.
 
             Confirmation:
               --confirm             Presses the native Submit button through
@@ -575,21 +601,17 @@ enum RelatoCLI {
               gathering. Agents should inspect the native app before `--confirm`; the
               local store check is useful evidence but not a server-side receipt.
               RelatoKit uses an Objective-C Accessibility engine for native UI automation.
-              Text fields are set through passive AX value writes, without moving focus,
-              clicking, or synthesizing keyboard input.
+              Text fields are set through passive AX value writes. With `--select-popups`,
+              native platform, area, and type menus are selected through AX actions.
               Snapshot attachments are staged into the local Feedback Assistant draft folder after the native draft
-              exists, avoiding the Add Attachment picker. RelatoKit fails closed instead of
-              foregrounding Feedback Assistant when a native control refuses background automation.
-              Feedback Assistant's SwiftUI popups can expose no selectable AX children while
-              hidden; in that case `--select-popups` fails closed instead of taking over input.
-              Cua/Peekaboo-style background input was tested and kept as a boundary:
-              useful for hidden text-field validation, not reliable for these popups.
+              exists, avoiding the Add Attachment picker. Popup selection briefly activates
+              Feedback Assistant and fails closed if the requested native option is absent.
 
             Agent pattern:
-              relato submit --payload feedback-submission.json --dry-run --confirm
-              relato submit --payload feedback-submission.json
-              # inspect native UI and satisfy Apple-only fields
-              relato submit --payload feedback-submission.json --confirm --verify-store
+              relato submit --payload feedback-submission.json --select-popups --dry-run
+              relato submit --payload feedback-submission.json --select-popups
+              # inspect native UI and satisfy any remaining Apple-only fields
+              relato submit --payload feedback-submission.json --select-popups --confirm --verify-store
               relato store list --limit 10
               relato store uploads --limit 10
             """
@@ -609,9 +631,8 @@ enum RelatoCLI {
               agent has already navigated the native app, manually selected a topic, or
               needs to retry form fill after changing native-only fields.
 
-              --select-popups asks the AX driver to select known area/type popups. Feedback
-              Assistant SwiftUI popups may expose no selectable AX children while hidden;
-              when that happens RelatoKit fails closed instead of stealing input.
+              --select-popups asks the AX driver to select known platform, area, and type
+              popups. Feedback Assistant is briefly activated for menu selection, then hidden.
             """
         )
     }

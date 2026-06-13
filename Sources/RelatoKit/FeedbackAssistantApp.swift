@@ -61,6 +61,7 @@ public enum FeedbackAssistantApp {
             payload.title,
             payload.description,
             payload.category.topic,
+            payload.platform ?? "",
             payload.category.area,
             payload.kind.nativeLabel,
             snapshot,

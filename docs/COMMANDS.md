@@ -7,8 +7,8 @@ This file is generated from live CLI help output. RelatoKit is optimized for age
 1. Research the issue and write supporting evidence to a local file.
 2. Run `relato prepare` to create `feedback-submission.json` and `feedback-submission.md`.
 3. Inspect both files before touching the native app.
-4. Run `relato submit --dry-run --payload feedback-submission.json`.
-5. Run `relato submit --payload feedback-submission.json` to open hidden, fill safe fields, stage attachments, and stop before Submit.
+4. Run `relato submit --dry-run --select-popups --payload feedback-submission.json`.
+5. Run `relato submit --select-popups --payload feedback-submission.json` to fill safe fields, select known native popups, stage attachments, and stop before Submit.
 6. Inspect Feedback Assistant for native-only fields, popups, diagnostics, and staged attachments.
 7. Use `--confirm` only after explicit user confirmation.
 8. Use `relato store list` and `relato store uploads` as local evidence afterward; they are not Apple server receipts.
@@ -18,6 +18,7 @@ This file is generated from live CLI help output. RelatoKit is optimized for age
 - `feedback-submission.json` is the machine-readable contract used by `open-native`, `fill`, and `submit`.
 - `feedback-submission.md` is the human-readable review artifact for logs, notes, or attachments.
 - `--snapshot PATH` can point to any local evidence file, not only an image.
+- `--platform PLATFORM` records the native platform popup value; it is inferred from the report when omitted.
 
 ## Global Help
 
@@ -34,8 +35,9 @@ Agent workflow:
        feedback-submission.json  machine-readable contract for relato
        feedback-submission.md    human-readable report for review/logs
   3. Inspect the Markdown and JSON before touching the native app.
-  4. Run `relato submit --dry-run --payload feedback-submission.json`.
-  5. Run `relato submit --payload feedback-submission.json` to open/fill only.
+  4. Run `relato submit --dry-run --select-popups --payload feedback-submission.json`.
+  5. Run `relato submit --select-popups --payload feedback-submission.json`
+     to open, fill, and select known native popups without submitting.
   6. Inspect Feedback Assistant for native-only fields, diagnostics, and files.
   7. Only after explicit user confirmation, run with `--confirm`.
   8. Use `relato store list` and `relato store uploads` as local evidence.
@@ -47,7 +49,7 @@ Commands:
   relato store uploads [--limit N] [--db PATH]
   relato categories [--db PATH]
   relato categorize --title TEXT [--description TEXT] [--bundle-id ID]
-  relato prepare --title TEXT --description TEXT [--snapshot PATH] [--bundle-id ID] [--kind bug|suggestion] [--output-dir DIR]
+  relato prepare --title TEXT --description TEXT [--snapshot PATH] [--bundle-id ID] [--platform PLATFORM] [--kind bug|suggestion] [--output-dir DIR]
   relato routes
   relato open ROUTE [--id ID] [--print-only]
   relato open-native [--payload PATH]
@@ -65,12 +67,11 @@ Safety:
   `--confirm` presses the native Submit button through Accessibility. It is not headless
   submission and local store verification is not an Apple server receipt.
   Native form automation uses an Objective-C Accessibility engine with passive
-  AX value writes for fields; it does not synthesize mouse or keyboard input.
-  Feedback Assistant is opened without activation and hidden after launch/fill.
+  AX value writes for fields and AX menu actions for requested popup selection.
+  Feedback Assistant is opened without activation. `--select-popups` briefly
+  activates it for menu selection, and the app is hidden after launch/fill.
   Snapshot attachments are staged into the local Feedback Assistant draft
   folder in the background after the native draft exists.
-  Cua/Peekaboo-style background input was tested: hidden text fields work,
-  Feedback Assistant SwiftUI popups still fail closed.
 ```
 
 To regenerate:
@@ -87,7 +88,7 @@ make generate-command-docs
 - `relato store uploads [--limit N] [--db PATH]`
 - `relato categories [--db PATH]`
 - `relato categorize --title TEXT [--description TEXT] [--bundle-id ID]`
-- `relato prepare --title TEXT --description TEXT [--snapshot PATH] [--bundle-id ID] [--kind bug|suggestion] [--output-dir DIR]`
+- `relato prepare --title TEXT --description TEXT [--snapshot PATH] [--bundle-id ID] [--platform PLATFORM] [--kind bug|suggestion] [--output-dir DIR]`
 - `relato routes`
 - `relato open ROUTE [--id ID] [--print-only]`
 - `relato open-native [--payload PATH]`
@@ -102,7 +103,7 @@ make generate-command-docs
 relato prepare: create the payload pair agents should review and reuse
 
 Usage:
-  relato prepare --title TEXT --description TEXT [--snapshot PATH] [--bundle-id ID] [--kind bug|suggestion] [--output-dir DIR]
+  relato prepare --title TEXT --description TEXT [--snapshot PATH] [--bundle-id ID] [--platform PLATFORM] [--kind bug|suggestion] [--output-dir DIR]
 
 Outputs:
   feedback-submission.json
@@ -119,6 +120,10 @@ Options:
   --snapshot PATH       Local evidence attachment. This can be a screenshot,
                         Markdown note, log, sysdiagnose pointer, or sample file.
   --bundle-id ID        App bundle ID when relevant.
+  --platform VALUE      Native platform label. Inferred from the title and
+                        description when omitted.
+                        Values: iOS, iPadOS, Mac Catalyst, macOS, tvOS,
+                        visionOS, watchOS, or Web & Services.
   --kind VALUE          bug or suggestion. Defaults to bug.
   --output-dir DIR      Where to write the JSON and Markdown files.
 
@@ -140,7 +145,7 @@ Agent pattern:
 relato prepare: create the payload pair agents should review and reuse
 
 Usage:
-  relato prepare --title TEXT --description TEXT [--snapshot PATH] [--bundle-id ID] [--kind bug|suggestion] [--output-dir DIR]
+  relato prepare --title TEXT --description TEXT [--snapshot PATH] [--bundle-id ID] [--platform PLATFORM] [--kind bug|suggestion] [--output-dir DIR]
 
 Outputs:
   feedback-submission.json
@@ -157,6 +162,10 @@ Options:
   --snapshot PATH       Local evidence attachment. This can be a screenshot,
                         Markdown note, log, sysdiagnose pointer, or sample file.
   --bundle-id ID        App bundle ID when relevant.
+  --platform VALUE      Native platform label. Inferred from the title and
+                        description when omitted.
+                        Values: iOS, iPadOS, Mac Catalyst, macOS, tvOS,
+                        visionOS, watchOS, or Web & Services.
   --kind VALUE          bug or suggestion. Defaults to bug.
   --output-dir DIR      Where to write the JSON and Markdown files.
 
@@ -181,8 +190,9 @@ Usage:
   relato submit [--payload PATH] [--select-popups] [--wait-seconds N] [--verify-wait-seconds N] [--db PATH] [--confirm] [--verify-store] [--dry-run]
 
 Default behavior:
-  Without `--confirm`, this opens Feedback Assistant without activation, fills
-  the native form from the JSON payload, hides the app, and stops before Submit.
+  Without `--confirm`, this fills the native form from the JSON payload, hides
+  the app, and stops before Submit. Without `--select-popups`, Feedback Assistant
+  is opened without activation. Popup selection briefly activates the app.
 
 Confirmation:
   --confirm             Presses the native Submit button through
@@ -201,21 +211,17 @@ Native form reality:
   gathering. Agents should inspect the native app before `--confirm`; the
   local store check is useful evidence but not a server-side receipt.
   RelatoKit uses an Objective-C Accessibility engine for native UI automation.
-  Text fields are set through passive AX value writes, without moving focus,
-  clicking, or synthesizing keyboard input.
+  Text fields are set through passive AX value writes. With `--select-popups`,
+  native platform, area, and type menus are selected through AX actions.
   Snapshot attachments are staged into the local Feedback Assistant draft folder after the native draft
-  exists, avoiding the Add Attachment picker. RelatoKit fails closed instead of
-  foregrounding Feedback Assistant when a native control refuses background automation.
-  Feedback Assistant's SwiftUI popups can expose no selectable AX children while
-  hidden; in that case `--select-popups` fails closed instead of taking over input.
-  Cua/Peekaboo-style background input was tested and kept as a boundary:
-  useful for hidden text-field validation, not reliable for these popups.
+  exists, avoiding the Add Attachment picker. Popup selection briefly activates
+  Feedback Assistant and fails closed if the requested native option is absent.
 
 Agent pattern:
-  relato submit --payload feedback-submission.json --dry-run --confirm
-  relato submit --payload feedback-submission.json
-  # inspect native UI and satisfy Apple-only fields
-  relato submit --payload feedback-submission.json --confirm --verify-store
+  relato submit --payload feedback-submission.json --select-popups --dry-run
+  relato submit --payload feedback-submission.json --select-popups
+  # inspect native UI and satisfy any remaining Apple-only fields
+  relato submit --payload feedback-submission.json --select-popups --confirm --verify-store
   relato store list --limit 10
   relato store uploads --limit 10
 ```
@@ -233,9 +239,8 @@ Notes:
   agent has already navigated the native app, manually selected a topic, or
   needs to retry form fill after changing native-only fields.
 
-  --select-popups asks the AX driver to select known area/type popups. Feedback
-  Assistant SwiftUI popups may expose no selectable AX children while hidden;
-  when that happens RelatoKit fails closed instead of stealing input.
+  --select-popups asks the AX driver to select known platform, area, and type
+  popups. Feedback Assistant is briefly activated for menu selection, then hidden.
 ```
 
 ### `relato help store`
@@ -266,4 +271,4 @@ Notes:
 - Use `relato open ROUTE --print-only` when you only need the Feedback Assistant URL.
 - Use `relato store summary` and `relato store list` for local verification after native submission.
 - Treat local store verification as local evidence, not an Apple server receipt.
-- `--select-popups` fails closed when Feedback Assistant exposes no selectable hidden AX children.
+- `--select-popups` briefly activates Feedback Assistant to select native platform, area, and type menus.

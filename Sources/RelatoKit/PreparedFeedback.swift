@@ -19,6 +19,7 @@ public struct PreparedFeedback: Codable, Equatable {
     public var description: String
     public var snapshot: String?
     public var bundleID: String?
+    public var platform: String?
     public var kind: FeedbackKind
     public var category: FeedbackCategory
     public var url: String
@@ -28,16 +29,26 @@ public struct PreparedFeedback: Codable, Equatable {
         case description
         case snapshot
         case bundleID = "bundle_id"
+        case platform
         case kind
         case category
         case url
     }
 
-    public init(title: String, description: String, snapshot: String?, bundleID: String?, kind: FeedbackKind, category: FeedbackCategory) throws {
+    public init(
+        title: String,
+        description: String,
+        snapshot: String?,
+        bundleID: String?,
+        kind: FeedbackKind,
+        category: FeedbackCategory,
+        platform: String? = nil
+    ) throws {
         self.title = title
         self.description = description
         self.snapshot = snapshot
         self.bundleID = bundleID
+        self.platform = platform
         self.kind = kind
         self.category = category
         self.url = try Self.buildFeedbackURL(title: title, description: description, snapshot: snapshot, category: category).absoluteString
@@ -68,6 +79,7 @@ public struct PreparedFeedback: Codable, Equatable {
 
         Category: \(category.topic)
         Area: \(category.area)
+        Platform: \(platform ?? "")
         Kind: \(kind.rawValue)
         Bundle ID: \(bundleID ?? "")
         Snapshot: \(snapshot ?? "")

@@ -186,8 +186,18 @@ static int RFASetText(AXUIElementRef root, NSString *label, NSString *value, cha
     return 0;
 }
 
-static int RFASelectPopup(AXUIElementRef root, NSArray<NSString *> *labels, NSString *value, char **errorOut) {
-    AXUIElementRef popup = RFAFindDescendant(root, ^BOOL(AXUIElementRef element) {
+static int RFASelectPopup(
+    AXUIElementRef app,
+    AXUIElementRef window,
+    NSArray<NSString *> *labels,
+    NSString *value,
+    char **errorOut
+) {
+    if (value.length == 0) {
+        return RFAFail(errorOut, [NSString stringWithFormat:@"No value provided for popup: %@", [labels componentsJoinedByString:@" / "]]);
+    }
+
+    AXUIElementRef popup = RFAFindDescendant(window, ^BOOL(AXUIElementRef element) {
         if (![RFARole(element) isEqualToString:NSAccessibilityPopUpButtonRole]) { return NO; }
         for (NSString *label in labels) {
             if (RFAMatches(element, label)) { return YES; }
@@ -198,6 +208,11 @@ static int RFASelectPopup(AXUIElementRef root, NSArray<NSString *> *labels, NSSt
         return RFAFail(errorOut, [NSString stringWithFormat:@"Could not find popup: %@", [labels componentsJoinedByString:@" / "]]);
     }
 
+    if ([RFAAttributeString(popup, kAXValueAttribute) caseInsensitiveCompare:value] == NSOrderedSame) {
+        CFRelease(popup);
+        return 0;
+    }
+
     AXUIElementSetAttributeValue(popup, kAXValueAttribute, (__bridge CFStringRef)value);
     [NSThread sleepForTimeInterval:0.25];
     if ([RFAAttributeString(popup, kAXValueAttribute) rangeOfString:value options:NSCaseInsensitiveSearch].location != NSNotFound) {
@@ -205,13 +220,44 @@ static int RFASelectPopup(AXUIElementRef root, NSArray<NSString *> *labels, NSSt
         return 0;
     }
 
-    return RFAFail(errorOut, [NSString stringWithFormat:@"Could not passively set popup value '%@' for %@ without taking keyboard focus", value, [labels componentsJoinedByString:@" / "]]);
+    if (!RFAPress(popup)) {
+        CFRelease(popup);
+        return RFAFail(errorOut, [NSString stringWithFormat:@"Could not open popup: %@", [labels componentsJoinedByString:@" / "]]);
+    }
+
+    AXUIElementRef menuItem = NULL;
+    for (NSInteger attempt = 0; attempt < 20 && menuItem == NULL; attempt++) {
+        menuItem = RFAFindDescendant(app, ^BOOL(AXUIElementRef element) {
+            return [RFARole(element) isEqualToString:NSAccessibilityMenuItemRole]
+                && [RFAAttributeString(element, kAXTitleAttribute) caseInsensitiveCompare:value] == NSOrderedSame;
+        });
+        if (menuItem == NULL) { [NSThread sleepForTimeInterval:0.1]; }
+    }
+
+    if (menuItem == NULL || !RFAPress(menuItem)) {
+        if (menuItem != NULL) { CFRelease(menuItem); }
+        CFRelease(popup);
+        return RFAFail(errorOut, [NSString stringWithFormat:@"Could not select popup value '%@' for %@", value, [labels componentsJoinedByString:@" / "]]);
+    }
+    CFRelease(menuItem);
+
+    for (NSInteger attempt = 0; attempt < 20; attempt++) {
+        if ([RFAAttributeString(popup, kAXValueAttribute) caseInsensitiveCompare:value] == NSOrderedSame) {
+            CFRelease(popup);
+            return 0;
+        }
+        [NSThread sleepForTimeInterval:0.1];
+    }
+
+    CFRelease(popup);
+    return RFAFail(errorOut, [NSString stringWithFormat:@"Popup did not commit value '%@' for %@", value, [labels componentsJoinedByString:@" / "]]);
 }
 
 int RelatoFeedbackAssistantFill(
     const char *title,
     const char *description,
     const char *topic,
+    const char *platform,
     const char *area,
     const char *kind,
     const char *snapshot,
@@ -284,9 +330,36 @@ int RelatoFeedbackAssistantFill(
     }
 
     if (selectPopups) {
-        result = RFASelectPopup(window, @[@"Which area are you seeing an issue with?"], RFAString(area), errorOut);
+        [runningApp unhide];
+        [runningApp activateWithOptions:NSApplicationActivateAllWindows];
+        [NSThread sleepForTimeInterval:0.25];
+
+        NSString *platformString = RFAString(platform);
+        if (platformString.length > 0) {
+            result = RFASelectPopup(
+                app,
+                window,
+                @[@"Which platform is most relevant for your report?"],
+                platformString,
+                errorOut
+            );
+            if (result != 0) { CFRelease(app); return result; }
+        }
+        result = RFASelectPopup(
+            app,
+            window,
+            @[@"Which technology does your report involve?", @"Which area are you seeing an issue with?"],
+            RFAString(area),
+            errorOut
+        );
         if (result != 0) { CFRelease(app); return result; }
-        result = RFASelectPopup(window, @[@"What type of feedback are you reporting?", @"What type of issue are you reporting?"], RFAString(kind), errorOut);
+        result = RFASelectPopup(
+            app,
+            window,
+            @[@"What type of feedback are you reporting?", @"What type of issue are you reporting?"],
+            RFAString(kind),
+            errorOut
+        );
         if (result != 0) { CFRelease(app); return result; }
     }
 

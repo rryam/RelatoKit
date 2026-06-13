@@ -57,8 +57,8 @@ def render(commands: list[str], global_help: str, topic_help: dict[str, str]) ->
         "1. Research the issue and write supporting evidence to a local file.",
         "2. Run `relato prepare` to create `feedback-submission.json` and `feedback-submission.md`.",
         "3. Inspect both files before touching the native app.",
-        "4. Run `relato submit --dry-run --payload feedback-submission.json`.",
-        "5. Run `relato submit --payload feedback-submission.json` to open hidden, fill safe fields, stage attachments, and stop before Submit.",
+        "4. Run `relato submit --dry-run --select-popups --payload feedback-submission.json`.",
+        "5. Run `relato submit --select-popups --payload feedback-submission.json` to fill safe fields, select known native popups, stage attachments, and stop before Submit.",
         "6. Inspect Feedback Assistant for native-only fields, popups, diagnostics, and staged attachments.",
         "7. Use `--confirm` only after explicit user confirmation.",
         "8. Use `relato store list` and `relato store uploads` as local evidence afterward; they are not Apple server receipts.",
@@ -68,6 +68,7 @@ def render(commands: list[str], global_help: str, topic_help: dict[str, str]) ->
         "- `feedback-submission.json` is the machine-readable contract used by `open-native`, `fill`, and `submit`.",
         "- `feedback-submission.md` is the human-readable review artifact for logs, notes, or attachments.",
         "- `--snapshot PATH` can point to any local evidence file, not only an image.",
+        "- `--platform PLATFORM` records the native platform popup value; it is inferred from the report when omitted.",
         "",
         "## Global Help",
         "",
@@ -114,7 +115,7 @@ def render(commands: list[str], global_help: str, topic_help: dict[str, str]) ->
             "- Use `relato open ROUTE --print-only` when you only need the Feedback Assistant URL.",
             "- Use `relato store summary` and `relato store list` for local verification after native submission.",
             "- Treat local store verification as local evidence, not an Apple server receipt.",
-            "- `--select-popups` fails closed when Feedback Assistant exposes no selectable hidden AX children.",
+            "- `--select-popups` briefly activates Feedback Assistant to select native platform, area, and type menus.",
             "",
         ]
     )
